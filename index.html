@@ -588,7 +588,9 @@ function buildPdf(){
     doc.text(`Sn° ${e.s}   cert. n° ${e.c}`+(e.e?`   (valide jusqu'au ${fmtD(e.e)})`:''),M+62,y+3.5);doc.setDrawColor(225);doc.line(M,y+5.5,M+CW,y+5.5);y+=6.5});
   band('Demande formulée');kv([['Défaut signalé',v('defSig')],['Défaut constaté',v('defCons')]]);
   t.sections.forEach(([nom,set,items])=>{band(nom);items.forEach(i=>status(i,choices[type+'|'+i]))});
-  band('Relevés de mesures');kv(t.champs.map(([l],i)=>[l.replace(/ \(.*\)/,''),v(`m_${type}_${i}`)]));
+  band('Relevés de mesures');/* Unité affichée après la valeur ; la tolérance reste dans le libellé */
+  kv(t.champs.map(([l,,u],i)=>{const val=v(`m_${type}_${i}`),lab=l.replace(/ \(([^)]*)\)/,(m,g)=>{const tol=g.split(',').map(s=>s.trim()).filter(s=>s.includes('±'));return tol.length?` (${tol.join(', ')})`:''});
+    return[lab,val?(u&&!val.toLowerCase().endsWith(u.toLowerCase())?`${val} ${u}`:val):'']}));
   band('Remarques / divers');doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(20);
   doc.splitTextToSize(v('rem')||'—',CW-2).forEach(l=>{pageCheck(5);doc.text(l,M+1,y+3.5);y+=4.6});y+=2;
   band('Conclusion');status('Appareil conforme',choices.conforme);kv([['Prochaine révision',fmtD(v('prochaine'))]]);
