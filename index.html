@@ -281,13 +281,22 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
         <div class="f"><label for="cEmail">E-mail</label><input id="cEmail"></div>
       </div>
       <div class="subh">Référence qualité du document</div>
+      <div class="lbl">Thermosoudeuse à défilement</div>
       <div class="grid">
-        <div class="f"><label for="cDocRef">Référence du document</label><input id="cDocRef" class="mono" placeholder="ENR-SAV-07"></div>
-        <div class="f"><label for="cDocVer">Version / indice</label><input id="cDocVer" class="mono" placeholder="3"></div>
-        <div class="f"><label for="cDocDate">Date d'application</label><input id="cDocDate" type="date"></div>
-        <div class="f"><label for="cDocPos">Afficher dans</label><select id="cDocPos"><option value="pied">Le pied de page</option><option value="les2">L'en-tête et le pied de page</option></select></div>
+        <div class="f"><label for="cDocRef_defil">Référence du document</label><input id="cDocRef_defil" class="mono" placeholder="ENR-SAV-07"></div>
+        <div class="f"><label for="cDocVer_defil">Version / indice</label><input id="cDocVer_defil" class="mono" placeholder="3"></div>
+        <div class="f"><label for="cDocDate_defil">Date d'application</label><input id="cDocDate_defil" type="date"></div>
       </div>
-      <div class="empty">Apparaît sur chaque page du PDF, par exemple « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 ». Changez la version ici à chaque révision de la procédure.</div>
+      <div class="lbl">Thermosoudeuse impulsion</div>
+      <div class="grid">
+        <div class="f"><label for="cDocRef_impul">Référence du document</label><input id="cDocRef_impul" class="mono" placeholder="ENR-SAV-08"></div>
+        <div class="f"><label for="cDocVer_impul">Version / indice</label><input id="cDocVer_impul" class="mono" placeholder="2"></div>
+        <div class="f"><label for="cDocDate_impul">Date d'application</label><input id="cDocDate_impul" type="date"></div>
+      </div>
+      <div class="grid">
+        <div class="f"><label for="cDocPos">Emplacement sur chaque page du PDF</label><select id="cDocPos"><option value="pied">En bas à gauche (pied de page)</option><option value="haut">En haut à droite</option><option value="les2">En haut à droite et en bas à gauche</option></select></div>
+      </div>
+      <div class="empty">Le PDF reprend la référence du type de rapport choisi, par exemple « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 ». Changez la version ici à chaque révision de la procédure.</div>
       <div class="subh">Changer le code</div>
       <div class="grid">
         <div class="f"><label for="cNew1">Nouveau code (6 caractères minimum)</label><input id="cNew1" type="password" autocomplete="new-password"></div>
@@ -442,10 +451,10 @@ function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=fals
   $('hTitre').textContent=CFG.titre;$('hNorme').textContent=CFG.norme;
   $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`+(docLine()?`<br><span class="mono">${esc(docLine())}</span>`:'')}
 /* Référence qualité : « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 » */
-function docLine(){const r=(CFG.docRef||'').trim(),v=(CFG.docVer||'').trim(),d=CFG.docDate?fmtD(CFG.docDate):'';
+function docLine(){const g=k=>String(CFG[k+'_'+type]||'').trim(),r=g('docRef'),v=g('docVer'),d=g('docDate')?fmtD(g('docDate')):'';
   const ver=v?('Version '+v.replace(/^v(ersion)?\s*/i,'')+(d?' du '+d:'')):(d?'Applicable le '+d:'');return [r?'Réf. '+r:'',ver].filter(Boolean).join(' – ')}
 function footerLine(){return `${CFG.societe} – ${CFG.adresse} – Tél : ${CFG.tel} – ${CFG.email}`}
-const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocRef:'docRef',cDocVer:'docVer',cDocDate:'docDate',cDocPos:'docPos'};
+const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocPos:'docPos'};['defil','impul'].forEach(t=>['DocRef','DocVer','DocDate'].forEach(k=>CF['c'+k+'_'+t]=k[0].toLowerCase()+k.slice(1)+'_'+t));
 let admTries=0,admUntil=0;
 const SETS={chk:[['Contrôlé','c'],['Remplacé','r'],['N/A','n']],yn:[['Oui','c'],['Non','k']],ok:[['Conforme','c'],['Non conforme','k']]};
 const TYPES={
@@ -523,7 +532,7 @@ function renderType(){
   t.sections.forEach(([nom,set,items])=>{h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}</h2><div class="body" style="gap:0">`+
     items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
   h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body" id="mesBody">${mesHTML()}</div></section>`;
-  $('dyn').innerHTML=h;setTimeout(markAuto);['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
+  $('dyn').innerHTML=h;setTimeout(markAuto);if(typeof CFG!=='undefined')applyCfg();['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
 }
 /* Relevés de mesures : un bloc par type d'emballage */
 let MES={};
@@ -541,7 +550,7 @@ $('dyn').addEventListener('click',ev=>{
   const r=ev.target.closest('[data-rmemb]');if(!r)return;
   if(!r.dataset.armed){r.dataset.armed=1;r.textContent='Confirmer';setTimeout(()=>{if(r.isConnected){delete r.dataset.armed;r.textContent='Retirer'}},4000);return}
   MES[type].emb.splice(+r.dataset.rmemb,1);AUTO.clear();$('mesBody').innerHTML=mesHTML();markAuto()});
-$('typeSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-type]');if(!b||b.dataset.type===type)return;type=b.dataset.type;renderType()});
+$('typeSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-type]');if(!b||b.dataset.type===type)return;type=b.dataset.type;renderType();applyCfg()});
 document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');
 /* Numéro provisoire : AAAA-S provisoire tant que le numéro définitif n'est pas connu */
 let riSaved='';
@@ -661,7 +670,7 @@ function buildPdf(){
   /* Bandeau supérieur, comme la barre de l'application */
   doc.setFillColor(...BAND);doc.rect(0,0,W,15,'F');doc.setDrawColor(...LINE);doc.line(0,15,W,15);doc.setTextColor(...NAVY);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text("Rapport d'intervention",M,6.6);
   doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text('RI n° '+(riVal()||'—'),M,11.4);
-  const dl=docLine(),dlTop=dl&&CFG.docPos==='les2';
+  const dl=docLine(),dlTop=dl&&(CFG.docPos==='les2'||CFG.docPos==='haut'),dlBot=dl&&CFG.docPos!=='haut';
   doc.setFont('helvetica','bold');doc.setFontSize(dlTop?8:9);doc.text(dlTop?dl:(CFG.societe||''),W-M,6.6,{align:'right'});
   doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text((dlTop&&v('date')?'Intervention du ':'')+(fmtD(v('date'))||''),W-M,11.4,{align:'right'});
   y=22;
@@ -738,7 +747,7 @@ function buildPdf(){
     const sw1=doc.getTextWidth(so);doc.setFont('helvetica','normal');const tw=sw1+doc.getTextWidth(rest),x0=W/2-tw/2;
     doc.setFont('helvetica','bold');doc.text(so,x0,287.2);doc.setFont('helvetica','normal');doc.text(rest,x0+sw1,287.2);
     doc.text(CFG.email||'',W/2,290.8,{align:'center'});
-    if(dl){doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(dl,62)[0],M,290.8);doc.setFont('helvetica','normal')}
+    if(dlBot){doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(dl,62)[0],M,290.8);doc.setFont('helvetica','normal')}
     doc.text(`${riVal()||''}  ·  page ${i}/${pages}`,W-M,290.8,{align:'right'});
     if(isProv()){try{doc.saveGraphicsState();doc.setGState(new doc.GState({opacity:0.1}));doc.setFont('helvetica','bold');doc.setFontSize(80);doc.setTextColor(180,91,8);
       doc.text('PROVISOIRE',W/2+10,175,{angle:45,align:'center'});doc.restoreGraphicsState()}catch(e){}}}
@@ -861,7 +870,7 @@ $('admOpen').onclick=()=>{$('admPanel').hidden=false;$('admPanel').scrollIntoVie
 function lockAdm(){$('ocrSec').hidden=true;$('admEdit').hidden=true;$('admLock').hidden=false;$('admCode').value='';$('admPanel').hidden=true;$('cNew1').value=$('cNew2').value=''}
 $('admUnlock').onclick=()=>{const now=Date.now();if(now<admUntil){$('admMsg').textContent=`Trop d'essais. Réessayez dans ${Math.ceil((admUntil-now)/1000)} s.`;return}
   if(hashCode($('admCode').value.trim())===CFG.hash){admTries=0;$('admMsg').textContent='';$('admLock').hidden=true;$('admEdit').hidden=false;$('ocrSec').hidden=false;
-    Object.entries(CF).forEach(([id,k])=>$(id).value=CFG[k]||'');$('cLogoPos').value=CFG.logoPos||'gauche';$('cLogoW').value=CFG.logoW||35;$('cLogoWv').textContent=(CFG.logoW||35)+' mm'}
+    Object.entries(CF).forEach(([id,k])=>$(id).value=CFG[k]||'');if(!$('cDocPos').value)$('cDocPos').value='pied';$('cLogoPos').value=CFG.logoPos||'gauche';$('cLogoW').value=CFG.logoW||35;$('cLogoWv').textContent=(CFG.logoW||35)+' mm'}
   else{admTries++;if(admTries>=5){admUntil=now+60000;admTries=0}$('admMsg').textContent='Code incorrect.'}};
 $('admCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('admUnlock').click()});
 function readAdm(){const n1=$('cNew1').value.trim(),n2=$('cNew2').value.trim();
