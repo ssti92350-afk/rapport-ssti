@@ -125,6 +125,17 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .range{display:flex;gap:10px;align-items:center}.range input{flex:1;padding:0}.range output{font-family:var(--f-mono);min-width:52px;text-align:right}
 .emb{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:10px}
 .emb-h{display:flex;justify-content:space-between;align-items:center;color:var(--accent);font-size:13.5px}
+.btn-main-in{background:var(--accent);color:var(--accent-fg)}
+.auto{outline:2px solid var(--warn)!important;outline-offset:1px;background:var(--warn-soft)!important}
+.row.auto{outline-offset:-2px;border-radius:6px;padding-inline:6px}
+.ocr-thumbs{display:flex;gap:8px;flex-wrap:wrap}.ocr-thumbs img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.modal{position:fixed;inset:0;z-index:30;background:color-mix(in srgb,#000 45%,transparent);display:grid;place-items:center;
+  padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modal-in{background:var(--surface);color:var(--fg);border-radius:12px;width:100%;max-width:560px;max-height:100%;overflow:auto;padding:18px;display:grid;gap:12px;border:1px solid var(--line)}
+.modal-in h2{margin:0;font-size:17px}
+.val-body{display:grid;gap:8px;font-size:14px}
+.val-body ul{margin:4px 0 0;padding-left:18px}
+.val-ok{font-weight:600}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
@@ -146,6 +157,20 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div>
 
   <div id="certNotice"></div>
+
+  <section id="ocrSec"><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
+    <div id="ocrOff" class="empty">La lecture des notes manuscrites nécessite une connexion internet et fonctionne dans la version Claude du rapport. Dans cette version, remplissez le rapport à la main.</div>
+    <div id="ocrOn" hidden style="display:grid;gap:10px">
+      <div class="empty">Photographiez vos notes (une ou plusieurs pages). Claude les lit et pré-remplit le rapport. Les champs remplis automatiquement sont surlignés en orange : vérifiez-les avant de valider.</div>
+      <div class="drop">
+        <label class="btn btn-line" for="ocrIn">Photographier / choisir les notes</label><input id="ocrIn" type="file" accept="image/*" multiple>
+        <button class="btn btn-main-in" type="button" id="ocrGo" disabled>Lire et remplir le rapport</button>
+        <button class="btn btn-line" type="button" id="ocrStop" hidden>Arrêter</button>
+      </div>
+      <div id="ocrThumbs" class="ocr-thumbs"></div>
+      <div id="ocrMsg" class="lbl" aria-live="polite"></div>
+    </div>
+  </div></section>
 
   <section><h2><span class="n">01</span>Type de rapport</h2><div class="body">
     <div class="typesel" id="typeSel"></div>
@@ -269,6 +294,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div></section>
 </div></main>
 <div class="toast" id="toast" hidden></div>
+<div class="modal" id="valModal" hidden role="dialog" aria-modal="true" aria-labelledby="valTitle"><div class="modal-in">
+  <h2 id="valTitle">Validation du rapport</h2>
+  <div id="valBody" class="val-body"></div>
+  <label class="prov val-ok"><input type="checkbox" id="valChk"> J'ai relu le rapport et je confirme l'exactitude des informations.</label>
+  <div class="f"><label for="valNom">Validé par</label><input id="valNom" placeholder="Nom du technicien"></div>
+  <div class="drop" style="justify-content:flex-end">
+    <button class="btn btn-line" type="button" id="valBack">Revenir au rapport</button>
+    <button class="btn btn-main-in" type="button" id="valGo" disabled>Valider et générer le PDF</button>
+  </div>
+</div></div>
 <script type="application/json" id="cfgData">{"titre": "RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE", "norme": "Selon NF EN ISO 11607", "societe": "SSTI", "adresse": "6 rue des Mariniers 94290 VILLENEUVE LE ROI", "tel": "09 73 28 37 52", "email": "secretariat@ssti-tm.com", "hash": "433bc52d169368d6be8a177634145c50028206dc1dd72de90397cb4a6701e4df"}</script>
 
 <script>
@@ -476,7 +511,7 @@ function renderType(){
   t.sections.forEach(([nom,set,items])=>{h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}</h2><div class="body" style="gap:0">`+
     items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
   h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body" id="mesBody">${mesHTML()}</div></section>`;
-  $('dyn').innerHTML=h;['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
+  $('dyn').innerHTML=h;setTimeout(markAuto);['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
 }
 /* Relevés de mesures : un bloc par type d'emballage */
 let MES={};
@@ -490,10 +525,10 @@ function mesHTML(){const t=TYPES[type],S=MES[type],inp=(id,l,val,i,attr)=>`<div 
     `<div><button type="button" class="btn btn-line" id="addEmb">Ajouter un emballage</button></div>`}
 $('dyn').addEventListener('input',ev=>{const d=ev.target.dataset;if(d.emb!=null)MES[type].emb[+d.emb][+d.i]=ev.target.value;else if(d.com!=null)MES[type].com[+d.com]=ev.target.value});
 $('dyn').addEventListener('click',ev=>{
-  if(ev.target.closest('#addEmb')){const S=MES[type],nb=newEmb(type);nb[0]='';S.emb.push(nb);$('mesBody').innerHTML=mesHTML();const f=$(`m_${type}_${S.emb.length-1}_0`);f&&f.focus();return}
+  if(ev.target.closest('#addEmb')){const S=MES[type],nb=newEmb(type);nb[0]='';S.emb.push(nb);$('mesBody').innerHTML=mesHTML();markAuto();const f=$(`m_${type}_${S.emb.length-1}_0`);f&&f.focus();return}
   const r=ev.target.closest('[data-rmemb]');if(!r)return;
   if(!r.dataset.armed){r.dataset.armed=1;r.textContent='Confirmer';setTimeout(()=>{if(r.isConnected){delete r.dataset.armed;r.textContent='Retirer'}},4000);return}
-  MES[type].emb.splice(+r.dataset.rmemb,1);$('mesBody').innerHTML=mesHTML()});
+  MES[type].emb.splice(+r.dataset.rmemb,1);AUTO.clear();$('mesBody').innerHTML=mesHTML();markAuto()});
 $('typeSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-type]');if(!b||b.dataset.type===type)return;type=b.dataset.type;renderType()});
 document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');
 /* Numéro provisoire : AAAA-S provisoire tant que le numéro définitif n'est pas connu */
@@ -527,7 +562,7 @@ $('btnReset').onclick=function(){const b=this;
   delete b.dataset.armed;b.textContent='Nouveau rapport';
   document.querySelectorAll('main input:not([type=checkbox]):not([id^=n]):not([id^=ech_])').forEach(i=>{if(!i.closest('#dyn'))i.value=''});
   $('fab').value='HAWO';$('defCons').value='Idem';$('defSig').selectedIndex=0;$('rem').value="Remplacement des éléments d'usure inclus au préventif.";
-  $('date').value=new Date().toISOString().slice(0,10);choices={};sel.clear();initMes();pads.forEach(p=>p.clear());PHOTOS=[];DOCS=[];renderMedia();
+  $('date').value=new Date().toISOString().slice(0,10);choices={};sel.clear();initMes();AUTO.clear();OCR_DOUTES=[];VALID=null;pads.forEach(p=>p.clear());PHOTOS=[];DOCS=[];renderMedia();
   renderType();renderEq();document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');$('riProv').checked=false;riSaved='';syncRi();
   window.scrollTo({top:0});toast('Formulaire vidé')};
 
@@ -621,6 +656,8 @@ function buildPdf(){
     doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20);doc.text(lab+(nom?' – '+nom:''),x,y+3);
     doc.setDrawColor(170);doc.rect(x,y+5,sw,28);if(p.used)doc.addImage(p.c.toDataURL('image/jpeg',0.92),'JPEG',x+1,y+6,sw-2,26)});
   y+=36;
+  if(VALID){pageCheck(8);doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(90);
+    doc.text(`Rapport relu et validé par ${VALID.nom} le ${VALID.date}.`,M,y);y+=6}
   /* Annexe : photos, deux par ligne */
   if(PHOTOS.length){doc.addPage();y=16;band('Photos ('+PHOTOS.length+')');const cw2=(CW-6)/2;
     for(let i=0;i<PHOTOS.length;i+=2){const row=PHOTOS.slice(i,i+2).map(p=>{const h=Math.min(cw2*p.h/p.w,70),w=h*p.w/p.h;return{p,w,h,cap:doc.splitTextToSize(p.cap?`${i+1+PHOTOS.slice(i,i+2).indexOf(p)}. ${p.cap}`:`Photo ${i+1+PHOTOS.slice(i,i+2).indexOf(p)}`,cw2)}});
@@ -652,7 +689,38 @@ let downloads=null;
 function dl(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);toast('PDF enregistré : '+name)}
 (async()=>{try{downloads=window.claude?.use?await window.claude.use('downloads'):null}catch(e){downloads=null}})();
-$('btnPdf').onclick=async function(){
+/* Validation obligatoire avant le PDF */
+function valReport(){const t=TYPES[type],S=MES[type],miss=[],warn=[];
+  if(!isProv()&&!$('ri').value.trim())miss.push('N° de rapport (ou cochez « rapport provisoire »)');
+  [['client','Client'],['modele','Modèle'],['sn','N° de série'],['date',"Date d'intervention"]].forEach(([id,l])=>{if(!$(id).value.trim())miss.push(l)});
+  if(!choices.conforme)miss.push('Conformité de l\'appareil');
+  const nr=[];t.sections.forEach(([,,items])=>items.forEach(i=>{if(!choices[type+'|'+i])nr.push(i)}));
+  if(nr.length)warn.push(`${nr.length} point(s) de contrôle non renseigné(s) : ${nr.slice(0,6).join(', ')}${nr.length>6?'…':''}`);
+  if(!sel.size)warn.push('Aucun appareil de mesure sélectionné');
+  const exp=EQ.filter(e=>sel.has(e.id)&&status(e).k==='bad');if(exp.length)warn.push('Appareil utilisé avec certificat expiré : '+exp.map(e=>e.n).join(', '));
+  if(!S.emb.some(r=>r.some((v,i)=>i>0&&v&&String(v).trim())))warn.push('Aucun relevé de mesure saisi');
+  if(!pads[0].used)warn.push('Signature du technicien absente');
+  if(!pads[1].used)warn.push('Signature du client absente');
+  const auto=[...document.querySelectorAll('.auto')];
+  let h='';
+  if(auto.length)h+=`<div class="notice warn"><b>${auto.length} champ(s) rempli(s) automatiquement depuis les notes manuscrites</b><span>Ils sont surlignés en orange dans le rapport. Vérifiez-les : un champ modifié n'est plus surligné.</span></div>`;
+  if(OCR_DOUTES.length)h+=`<div class="notice warn"><b>Passages douteux dans les notes</b><ul>${OCR_DOUTES.map(d=>`<li>${esc(d)}</li>`).join('')}</ul></div>`;
+  if(miss.length)h+=`<div class="notice bad"><b>Informations manquantes</b><ul>${miss.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`;
+  if(warn.length)h+=`<div class="notice warn"><b>À vérifier</b><ul>${warn.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`;
+  if(!h)h='<div class="notice ok"><b>Le rapport est complet.</b></div>';
+  h+=`<div class="empty">Rapport ${esc(riVal()||'sans numéro')} · ${esc($('client').value||'client non renseigné')} · ${esc(TYPES[type].nom)} · ${S.emb.length} emballage(s)</div>`;
+  $('valBody').innerHTML=h;$('valChk').checked=false;$('valGo').disabled=true;if(!$('valNom').value)$('valNom').value=$('techNom').value;
+  $('valModal').hidden=false;$('valChk').focus()}
+let VALID=null;
+$('valChk').onchange=()=>$('valGo').disabled=!$('valChk').checked||!$('valNom').value.trim();
+$('valNom').oninput=$('valChk').onchange;
+$('valBack').onclick=()=>{$('valModal').hidden=true;const a=document.querySelector('.auto');if(a)a.scrollIntoView({behavior:'smooth',block:'center'})};
+$('valModal').addEventListener('keydown',e=>{if(e.key==='Escape')$('valBack').click()});
+$('btnPdf').onclick=()=>valReport();
+$('valGo').onclick=async function(){const now=new Date();
+  VALID={nom:$('valNom').value.trim(),date:`${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()} à ${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`};
+  $('valModal').hidden=true;await genPdf.call($('btnPdf'))};
+async function genPdf(){
   const b=this;b.disabled=true;b.textContent='Création…';
   try{const doc=buildPdf(),name=fileName(),blob=doc.output('blob');
     if(downloads){try{await downloads.save({filename:name,data:blob});toast('PDF enregistré : '+name)}
@@ -663,7 +731,64 @@ $('btnPdf').onclick=async function(){
         try{await navigator.share({files:[file],title:name});toast('PDF prêt : '+name)}catch(e){if(e.name!=='AbortError')dl(blob,name)}}
       else dl(blob,name)}}
   catch(e){console.error(e);toast('Erreur pendant la création du PDF.')}
-  finally{b.disabled=false;b.textContent='Générer le PDF'}};
+  finally{b.disabled=false;b.textContent='Générer le PDF'}}
+
+/* Lecture des notes manuscrites (Claude, version en ligne uniquement) */
+let AUTO=new Set(),OCR_DOUTES=[],OCR_FILES=[],ocrSample=null,ocrCtl=null;
+function markAuto(){document.querySelectorAll('.auto').forEach(e=>e.classList.remove('auto'));
+  AUTO.forEach(k=>{if(k.startsWith('k:')){const c=document.querySelector(`.chip[data-k="${CSS.escape(k.slice(2))}"]`);c&&c.closest('.row').classList.add('auto')}
+    else{const e=$(k);e&&e.classList.add('auto')}})}
+document.addEventListener('input',ev=>{if(ev.target.id&&AUTO.delete(ev.target.id))ev.target.classList.remove('auto')});
+document.addEventListener('change',ev=>{if(ev.target.id&&AUTO.delete(ev.target.id))ev.target.classList.remove('auto')});
+document.addEventListener('click',ev=>{const c=ev.target.closest('.chip');if(c&&AUTO.delete('k:'+c.dataset.k)){const r=c.closest('.row');r&&r.classList.remove('auto')}});
+(async()=>{try{ocrSample=window.claude?.use?await window.claude.use('sample'):null;
+  if(!ocrSample)return;const lim=await ocrSample.limits().catch(()=>null);if(!lim||!lim.images)return;
+  $('ocrIn').accept=lim.images.mediaTypes.join(',');$('ocrIn').dataset.max=lim.images.maxCount;$('ocrOff').hidden=true;$('ocrOn').hidden=false}catch(e){}})();
+$('ocrIn').addEventListener('change',ev=>{const max=+ev.target.dataset.max||5;OCR_FILES=[...ev.target.files].slice(0,max);ev.target.value='';
+  $('ocrThumbs').innerHTML='';OCR_FILES.forEach(f=>{const i=document.createElement('img');i.src=URL.createObjectURL(f);i.alt='Notes';$('ocrThumbs').appendChild(i)});
+  $('ocrGo').disabled=!OCR_FILES.length;$('ocrMsg').textContent=OCR_FILES.length?`${OCR_FILES.length} page(s) prête(s).`:''});
+function ocrPrompt(){const T=Object.entries(TYPES).map(([k,t])=>({code:k,nom:t.nom,
+    points_de_controle:t.sections.map(([n,set,items])=>({section:n,valeurs_possibles:SETS[set].map(s=>s[0]),items})),
+    releves_par_emballage:t.champs.filter(c=>!c[3]).map(c=>c[0]),releves_communs:t.champs.filter(c=>c[3]).map(c=>c[0])}));
+  return `Tu lis les notes manuscrites d'un technicien de maintenance (photos jointes) prises pendant l'intervention sur une thermosoudeuse médicale (fabricant souvent HAWO), et tu remplis un rapport d'intervention.
+Règles :
+- Ne recopie que ce qui est écrit dans les notes. N'invente rien. Si une information est absente, mets null (ou omets la clé).
+- Si un mot ou un chiffre est difficile à lire, donne ta meilleure lecture et ajoute une phrase courte dans "doutes" (ex. "N° de série : 438780 ou 438786 ?").
+- Abréviations courantes : RAS/OK/✓ = Contrôlé ou Oui ; "chgt", "rempl.", "neuf" = Remplacé ; "NC" = Non conforme ; "C" = Conforme.
+- Choisis le type de machine : "defil" (thermosoudeuse à défilement, ex. HM3010DCV : courroies, galet, vitesse en m/min) ou "impul" (thermosoudeuse impulsion, ex. HM660ASV : mâchoires, ruban de chauffe, ts/tc).
+- Pour points_de_controle et releves, utilise EXACTEMENT les libellés et valeurs fournis ci-dessous. Valeurs numériques sans unité, point décimal.
+- Dates au format AAAA-MM-JJ (date d'intervention) et AAAA-MM (prochaine révision).
+Définition des types :
+${JSON.stringify(T)}
+Réponds avec uniquement ce JSON :
+{"type":"defil|impul","ri":null,"date":null,"client":null,"contact":null,"adresse":null,"cp_ville":null,"fabricant":null,"modele":null,"numero_serie":null,"version_software":null,"date_fabrication":null,"compteur":null,"defaut_signale":"PRÉVENTIF|CURATIF|AUTRE|null","defaut_constate":null,
+"points_de_controle":{"<libellé exact>":"<valeur possible exacte>"},"sealcheck_non_realisable":false,
+"emballages":[{"<libellé de relevé par emballage>":"valeur"}],"releves_communs":{"<libellé>":"valeur"},
+"remarques":null,"conformite":"Conforme|Non conforme|null","prochaine_revision":null,"technicien":null,"doutes":["..."]}`}
+function applyOcr(d){AUTO.clear();const setF=(id,val)=>{if(val==null||String(val).trim()==='')return;const e=$(id);if(!e)return;
+    if(e.tagName==='SELECT'){const nz=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(),o=[...e.options].find(o=>nz(o.text)===nz(val));if(!o)return;e.value=o.value}else e.value=String(val);AUTO.add(id)};
+  if(d.type&&TYPES[d.type])type=d.type;const t=TYPES[type];
+  if(d.ri&&!isProv())setF('ri',d.ri);setF('date',/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')?d.date:null);
+  [['client','client'],['contact','contact'],['adresse','adresse'],['cpville','cp_ville'],['fab','fabricant'],['modele','modele'],['sn','numero_serie'],['soft','version_software'],['dfab','date_fabrication'],['compteur','compteur'],['defSig','defaut_signale'],['defCons','defaut_constate'],['rem','remarques'],['techNom','technicien']].forEach(([id,k])=>setF(id,d[k]));
+  setF('prochaine',/^\d{4}-\d{2}$/.test(d.prochaine_revision||'')?d.prochaine_revision:null);
+  const pc=d.points_de_controle||{};t.sections.forEach(([,set,items])=>items.forEach(i=>{const v=pc[i];if(v&&SETS[set].some(s=>s[0]===v)){choices[type+'|'+i]=v;AUTO.add('k:'+type+'|'+i)}}));
+  if(d.sealcheck_non_realisable===true)choices.sealNA=true;
+  if(d.conformite==='Conforme'||d.conformite==='Non conforme'){choices.conforme=d.conformite;AUTO.add('k:conforme')}
+  const S=MES[type],em=Array.isArray(d.emballages)?d.emballages.filter(x=>x&&typeof x==='object'):[];
+  if(em.length){S.emb=em.map((row,b)=>t.champs.map((c,i)=>{if(c[3])return null;const v=row[c[0]];if(v!=null&&String(v).trim()!==''){AUTO.add(`m_${type}_${b}_${i}`);return String(v)}return i===0?'':(c[1]||'')}))}
+  const rc=d.releves_communs||{};t.champs.forEach((c,i)=>{if(c[3]&&rc[c[0]]!=null&&String(rc[c[0]]).trim()!==''){S.com[i]=String(rc[c[0]]);AUTO.add(`mc_${type}_${i}`)}});
+  OCR_DOUTES=Array.isArray(d.doutes)?d.doutes.map(String).slice(0,12):[];
+  document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');renderType();syncRi();markAuto()}
+$('ocrGo').onclick=async()=>{if(!ocrSample||!OCR_FILES.length)return;ocrCtl=new AbortController();
+  $('ocrGo').disabled=true;$('ocrStop').hidden=false;$('ocrMsg').textContent='Lecture des notes en cours… (jusqu\'à une minute)';
+  try{const d=await ocrSample.json(ocrPrompt(),{images:OCR_FILES,signal:ocrCtl.signal,modelTier:'default'});
+    if(!d||typeof d!=='object')throw{code:'invalid_json'};applyOcr(d);
+    $('ocrMsg').textContent=`${AUTO.size} champ(s) rempli(s), surlignés en orange.`+(OCR_DOUTES.length?` ${OCR_DOUTES.length} passage(s) douteux signalé(s) à la validation.`:'')+' Vérifiez-les avant de générer le PDF.';
+    toast('Rapport pré-rempli – à vérifier')}
+  catch(e){const m={cancelled:'Lecture arrêtée.',not_granted:'Accès à Claude refusé pour ce rapport.',rate_limited:'Limite d\'utilisation atteinte, réessayez plus tard.',image_rejected:'Une photo n\'est pas lisible (format ou taille).',invalid_json:'Les notes n\'ont pas pu être interprétées. Réessayez avec une photo plus nette.',refused:'Les notes n\'ont pas pu être lues.'}[e&&e.code]||'La lecture a échoué. Vérifiez la connexion et réessayez.';
+    $('ocrMsg').textContent=m;if(e&&['not_granted','sampling_disabled','images_unavailable'].includes(e.code)){$('ocrOn').hidden=true;$('ocrOff').hidden=false}}
+  finally{$('ocrGo').disabled=!OCR_FILES.length;$('ocrStop').hidden=true;ocrCtl=null}};
+$('ocrStop').onclick=()=>ocrCtl&&ocrCtl.abort();
 
 $('date').value=new Date().toISOString().slice(0,10);
 renderType();renderEq();renderMedia();applyCfg();
@@ -691,7 +816,7 @@ $('admExport').onclick=async()=>{if(!readAdm())return;try{localStorage.setItem('
   const cl=document.documentElement.cloneNode(true),q=s=>cl.querySelector(s);
   q('#cfgData').textContent=JSON.stringify(CFG);
   ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
-  cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');
+  cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');q('#valModal').setAttribute('hidden','');q('#ocrOn').setAttribute('hidden','');q('#ocrOff').removeAttribute('hidden');q('#ocrThumbs').innerHTML='';q('#ocrMsg').textContent='';
   const html='<!DOCTYPE html>\n'+cl.outerHTML,name='rapport_SSTI_hors_ligne.html';
   if(downloads){try{await downloads.save({filename:name,data:html});toast('Version techniciens enregistrée')}catch(e){toast('Enregistrement annulé.')}}
   else dl(new Blob([html],{type:'text/html'}),name)};
