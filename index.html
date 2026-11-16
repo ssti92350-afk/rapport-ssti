@@ -123,6 +123,8 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .empty{font-size:13.5px;color:var(--muted)}
 #hLogo{max-width:100%;height:auto;display:block;margin-bottom:6px}
 .range{display:flex;gap:10px;align-items:center}.range input{flex:1;padding:0}.range output{font-family:var(--f-mono);min-width:52px;text-align:right}
+.emb{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:10px}
+.emb-h{display:flex;justify-content:space-between;align-items:center;color:var(--accent);font-size:13.5px}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
@@ -410,7 +412,7 @@ const TYPES={
   sections:[
    ['Contrôle qualité / interventions','chk',['Inspection visuelle','Mise en route, contrôle autotest','Contrôle du clavier','Nettoyage interne de la soudeuse','Téflons mâchoire supérieure','Téflons mâchoire inférieure','Ruban de chauffe supérieur','Ruban de chauffe inférieur','Contrôle et calibration T° ambiante','Contrôle pression de scellage','Contrôle du système de coupe']],
    ['Réglage et contrôle final','yn',['Synchronisation électrique (système zéro)','Contrôle visuel intégrité soudure']]],
-  champs:[["Type d'emballage",'ULTRA',''],['TS consigne (°C, ±3 °C)','145','°C'],['TS mesurée (°C)','','°C'],['ts – temps de soudure (s)','2','s'],['tc – temps de refroidissement (s)','3','s'],['T° ambiante (°C)','','°C'],['Pression de scellage (N)','','N']]}
+  champs:[["Type d'emballage",'ULTRA',''],['TS consigne (°C, ±3 °C)','145','°C'],['TS mesurée (°C)','','°C'],['ts – temps de soudure (s)','2','s'],['tc – temps de refroidissement (s)','3','s'],['T° ambiante (°C)','','°C',true],['Pression de scellage (N)','','N']]}
 };
 const DEF_EQ=[
  {id:'e1',n:'Thermomètre RS 1316',s:'160203433',c:'2604132601',e:''},
@@ -473,10 +475,25 @@ function renderType(){
   let n=6,h='';
   t.sections.forEach(([nom,set,items])=>{h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}</h2><div class="body" style="gap:0">`+
     items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
-  h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body grid">`+
-    t.champs.map(([l,v],i)=>`<div class="f"><label for="m_${type}_${i}">${esc(l)}</label><input id="m_${type}_${i}" class="mono" value="${esc(v)}" inputmode="${i?'decimal':'text'}"></div>`).join('')+'</div></section>';
+  h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body" id="mesBody">${mesHTML()}</div></section>`;
   $('dyn').innerHTML=h;['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
 }
+/* Relevés de mesures : un bloc par type d'emballage */
+let MES={};
+function newEmb(t){return TYPES[t].champs.map(([,d,,com])=>com?null:d)}
+function initMes(){MES={};Object.keys(TYPES).forEach(t=>MES[t]={emb:[newEmb(t)],com:TYPES[t].champs.map(([,d,,com])=>com?d:null)})}
+initMes();
+function mesHTML(){const t=TYPES[type],S=MES[type],inp=(id,l,val,i,attr)=>`<div class="f"><label for="${id}">${esc(l)}</label><input id="${id}" class="mono" value="${esc(val??'')}" ${attr} inputmode="${i?'decimal':'text'}" ${i?'':'placeholder="BOP, ULTRA…"'}></div>`;
+  const com=t.champs.map((c,i)=>c[3]?inp(`mc_${type}_${i}`,c[0],S.com[i],i,`data-com="${i}"`):'').join('');
+  return (com?`<div class="grid">${com}</div>`:'')+S.emb.map((vals,b)=>`<div class="emb"><div class="emb-h"><b>Emballage ${b+1}</b>${S.emb.length>1?`<button type="button" class="link" data-rmemb="${b}">Retirer</button>`:''}</div><div class="grid">`+
+    t.champs.map((c,i)=>c[3]?'':inp(`m_${type}_${b}_${i}`,c[0],vals[i],i,`data-emb="${b}" data-i="${i}"`)).join('')+'</div></div>').join('')+
+    `<div><button type="button" class="btn btn-line" id="addEmb">Ajouter un emballage</button></div>`}
+$('dyn').addEventListener('input',ev=>{const d=ev.target.dataset;if(d.emb!=null)MES[type].emb[+d.emb][+d.i]=ev.target.value;else if(d.com!=null)MES[type].com[+d.com]=ev.target.value});
+$('dyn').addEventListener('click',ev=>{
+  if(ev.target.closest('#addEmb')){const S=MES[type],nb=newEmb(type);nb[0]='';S.emb.push(nb);$('mesBody').innerHTML=mesHTML();const f=$(`m_${type}_${S.emb.length-1}_0`);f&&f.focus();return}
+  const r=ev.target.closest('[data-rmemb]');if(!r)return;
+  if(!r.dataset.armed){r.dataset.armed=1;r.textContent='Confirmer';setTimeout(()=>{if(r.isConnected){delete r.dataset.armed;r.textContent='Retirer'}},4000);return}
+  MES[type].emb.splice(+r.dataset.rmemb,1);$('mesBody').innerHTML=mesHTML()});
 $('typeSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-type]');if(!b||b.dataset.type===type)return;type=b.dataset.type;renderType()});
 document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');
 /* Numéro provisoire : AAAA-S provisoire tant que le numéro définitif n'est pas connu */
@@ -510,7 +527,7 @@ $('btnReset').onclick=function(){const b=this;
   delete b.dataset.armed;b.textContent='Nouveau rapport';
   document.querySelectorAll('main input:not([type=checkbox]):not([id^=n]):not([id^=ech_])').forEach(i=>{if(!i.closest('#dyn'))i.value=''});
   $('fab').value='HAWO';$('defCons').value='Idem';$('defSig').selectedIndex=0;$('rem').value="Remplacement des éléments d'usure inclus au préventif.";
-  $('date').value=new Date().toISOString().slice(0,10);choices={};sel.clear();pads.forEach(p=>p.clear());PHOTOS=[];DOCS=[];renderMedia();
+  $('date').value=new Date().toISOString().slice(0,10);choices={};sel.clear();initMes();pads.forEach(p=>p.clear());PHOTOS=[];DOCS=[];renderMedia();
   renderType();renderEq();document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');$('riProv').checked=false;riSaved='';syncRi();
   window.scrollTo({top:0});toast('Formulaire vidé')};
 
@@ -588,9 +605,14 @@ function buildPdf(){
     doc.text(`Sn° ${e.s}   cert. n° ${e.c}`+(e.e?`   (valide jusqu'au ${fmtD(e.e)})`:''),M+62,y+3.5);doc.setDrawColor(225);doc.line(M,y+5.5,M+CW,y+5.5);y+=6.5});
   band('Demande formulée');kv([['Défaut signalé',v('defSig')],['Défaut constaté',v('defCons')]]);
   t.sections.forEach(([nom,set,items])=>{band(nom);items.forEach(i=>status(i,choices[type+'|'+i]))});
-  band('Relevés de mesures');/* Unité affichée après la valeur ; la tolérance reste dans le libellé */
-  kv(t.champs.map(([l,,u],i)=>{const val=v(`m_${type}_${i}`),lab=l.replace(/ \(([^)]*)\)/,(m,g)=>{const tol=g.split(',').map(s=>s.trim()).filter(s=>s.includes('±'));return tol.length?` (${tol.join(', ')})`:''});
-    return[lab,val?(u&&!val.toLowerCase().endsWith(u.toLowerCase())?`${val} ${u}`:val):'']}));
+  /* Relevés : unité après la valeur, tolérance dans le libellé, un bloc par emballage */
+  const S=MES[type],lab=l=>l.replace(/ \(([^)]*)\)/,(m,g)=>{const tol=g.split(',').map(s=>s.trim()).filter(s=>s.includes('±'));return tol.length?` (${tol.join(', ')})`:''});
+  const withU=(val,u)=>{val=(val||'').trim();return val?(u&&!val.toLowerCase().endsWith(u.toLowerCase())?`${val} ${u}`:val):''};
+  band('Relevés de mesures'+(S.emb.length>1?` – ${S.emb.length} emballages`:''));
+  const com=t.champs.map((c,i)=>c[3]?[lab(c[0]),withU(S.com[i],c[2])]:null).filter(Boolean);if(com.length)kv(com);
+  S.emb.forEach((vals,b)=>{pageCheck(16);doc.setFillColor(227,236,245);doc.rect(M,y,CW,6,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(29,79,122);
+    doc.text(`Emballage ${b+1}`+(vals[0]?` – ${vals[0]}`:''),M+2,y+4.2);y+=7.5;
+    kv(t.champs.map((c,i)=>(c[3]||i===0)?null:[lab(c[0]),withU(vals[i],c[2])]).filter(Boolean))});
   band('Remarques / divers');doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(20);
   doc.splitTextToSize(v('rem')||'—',CW-2).forEach(l=>{pageCheck(5);doc.text(l,M+1,y+3.5);y+=4.6});y+=2;
   band('Conclusion');status('Appareil conforme',choices.conforme);kv([['Prochaine révision',fmtD(v('prochaine'))]]);
