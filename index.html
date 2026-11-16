@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d4f7a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rapport SSTI">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<title>Rapport d'intervention SSTI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : fiche d'atelier en une colonne, barre d'action collante, sections numérotées comme un formulaire papier */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --fg:#1b2430; --muted:#5b6675; --line:#d5dbe3;
+  --accent:#1d4f7a; --accent-fg:#ffffff; --accent-soft:#e3ecf5;
+  --ok:#2c7a3f; --ok-soft:#e2f2e6; --repl:#1f62b0; --repl-soft:#e1ecfa;
+  --warn:#b45b08; --warn-soft:#fdf0e1; --bad:#b3261e; --bad-soft:#fbe5e3; --na:#6b7480; --na-soft:#eceef1;
+  --paper:#ffffff; --ink:#111111;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --surface:#1a2129; --fg:#e4e9ef; --muted:#9aa6b4; --line:#2e3844;
+  --accent:#6fa8dc; --accent-fg:#0d1620; --accent-soft:#1d2d3d;
+  --ok:#6cc583; --ok-soft:#1b3123; --repl:#7fb2ef; --repl-soft:#1a2b42;
+  --warn:#f0a25a; --warn-soft:#3a2814; --bad:#f08a82; --bad-soft:#3d1d1b; --na:#a3acb7; --na-soft:#262d36;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --surface:#1a2129; --fg:#e4e9ef; --muted:#9aa6b4; --line:#2e3844;
+  --accent:#6fa8dc; --accent-fg:#0d1620; --accent-soft:#1d2d3d;
+  --ok:#6cc583; --ok-soft:#1b3123; --repl:#7fb2ef; --repl-soft:#1a2b42;
+  --warn:#f0a25a; --warn-soft:#3a2814; --bad:#f08a82; --bad-soft:#3d1d1b; --na:#a3acb7; --na-soft:#262d36;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--accent)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--accent);color:var(--accent-fg);
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar-in{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar-title{font-weight:600;flex:1;min-width:0;font-size:14px;letter-spacing:.02em}
+.bar-title small{display:block;font-weight:400;opacity:.8;font-family:var(--f-mono);font-size:12px}
+.btn{font:inherit;font-weight:600;font-size:14px;border-radius:6px;padding:9px 14px;cursor:pointer;border:1px solid transparent}
+.btn-main{background:var(--accent-fg);color:var(--accent)}
+.btn-ghost{background:transparent;color:var(--accent-fg);border-color:color-mix(in srgb,var(--accent-fg) 45%,transparent)}
+.btn-line{background:var(--surface);color:var(--fg);border-color:var(--line);font-weight:500;padding:7px 12px}
+.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[disabled]{opacity:.55;cursor:default}
+main{padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet{max-width:860px;margin:0 auto;display:grid;gap:14px}
+.head{display:grid;gap:4px;text-align:center;padding-block:6px}
+.head h1{margin:0;font-size:19px;letter-spacing:.03em;text-wrap:balance}
+.head .type{font-weight:600;color:var(--accent);letter-spacing:.06em}
+.head .norm{color:var(--muted);font-size:13px}
+.notice{border-radius:8px;padding:10px 12px;font-size:14px;display:grid;gap:4px}
+.notice.warn{background:var(--warn-soft);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.notice.bad{background:var(--bad-soft);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent)}
+.notice.ok{background:var(--ok-soft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+section>h2{margin:0;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;padding:9px 14px;background:var(--accent-soft);color:var(--accent);display:flex;gap:10px;align-items:baseline}
+section>h2 .n{font-family:var(--f-mono);font-weight:500;opacity:.75}
+.body{padding:12px 14px;display:grid;gap:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.f{display:grid;gap:4px;min-width:0}
+.f label,.lbl{font-size:12px;color:var(--muted);font-weight:500}
+input,select,textarea{font:inherit;font-size:15px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)}
+input::placeholder,textarea::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.typesel{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.typecard{border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;background:var(--surface);color:var(--fg);text-align:left;font:inherit;display:grid;gap:2px}
+.typecard b{font-size:14px}.typecard span{font-size:12.5px;color:var(--muted)}
+.typecard[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-block:7px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .t{flex:1;min-width:170px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:13px;font-weight:500;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;min-height:34px}
+.chip[aria-pressed="true"].c{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.chip[aria-pressed="true"].r{background:var(--repl);border-color:var(--repl);color:var(--surface)}
+.chip[aria-pressed="true"].n{background:var(--na);border-color:var(--na);color:var(--surface)}
+.chip[aria-pressed="true"].k{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.subh{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:6px}
+.eq{display:flex;gap:10px;align-items:flex-start;padding-block:8px;border-bottom:1px solid var(--line);cursor:pointer}
+.eq:last-child{border-bottom:0}
+.eq input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--accent)}
+.eq .d{display:grid;gap:2px;min-width:0}
+.eq .meta{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;width:max-content}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.na{background:var(--na-soft);color:var(--na)}
+details{border-top:1px dashed var(--line);padding-top:8px}
+summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--accent)}
+.mgr{display:grid;gap:8px;padding-top:10px}
+.mgr-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;padding:8px;border:1px solid var(--line);border-radius:8px}
+.mgr-item .nm{font-weight:600;font-size:14px;grid-column:1/-1}
+.sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.sig{display:grid;gap:6px}
+canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--muted);border-radius:6px;touch-action:none;display:block}
+.sig-h{display:flex;justify-content:space-between;align-items:center}
+.seal-off{text-decoration:line-through;text-decoration-thickness:2px;color:var(--muted)}
+.seal-btn{font:inherit;font-size:12px;margin-left:6px;padding:2px 8px;border-radius:999px;border:1px dashed var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.seal-btn[aria-pressed="true"]{border-style:solid;border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.prov{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg);cursor:pointer;font-weight:400}
+.prov input{width:18px;height:18px;flex:none;accent-color:var(--warn)}
+#ri[readonly]{background:var(--warn-soft);color:var(--warn);font-weight:600;border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.bar-title small{overflow-wrap:anywhere}
+@media (max-width:520px){.bar-title{flex-basis:100%}.bar-in .btn{flex:1}}
+.drop{display:flex;gap:8px;flex-wrap:wrap}
+.drop label.btn{display:inline-flex;align-items:center}
+.drop input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.thumb{border:1px solid var(--line);border-radius:8px;overflow:hidden;display:grid;background:var(--surface);min-width:0}
+.thumb img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:var(--na-soft)}
+.thumb .ti{display:grid;gap:6px;padding:8px}
+.thumb input{font-size:13px;padding:6px 8px}
+.doc{display:flex;gap:10px;align-items:center;justify-content:space-between;padding-block:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.doc:last-child{border-bottom:0}
+.doc .d{display:grid;min-width:0;flex:1}.doc .d b{overflow-wrap:anywhere;font-size:14px}.doc .d span{font-size:12.5px;color:var(--muted)}
+.empty{font-size:13.5px;color:var(--muted)}
+#hLogo{max-width:100%;height:auto;display:block;margin-bottom:6px}
+.range{display:flex;gap:10px;align-items:center}.range input{flex:1;padding:0}.range output{font-family:var(--f-mono);min-width:52px;text-align:right}
+.link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.chip,.typecard{transition:background-color .12s,border-color .12s}}
+</style>
+
+<div class="bar"><div class="bar-in">
+  <div class="bar-title">Rapport d'intervention<small id="barRi">RI n° —</small></div>
+  <button class="btn btn-ghost" id="btnReset" type="button">Nouveau rapport</button>
+  <button class="btn btn-main" id="btnPdf" type="button">Générer le PDF</button>
+</div></div>
+
+<main><div class="sheet">
+  <div class="head">
+    <img id="hLogo" alt="Logo" hidden>
+    <h1 id="hTitre">RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE</h1>
+    <div class="type" id="headType">THERMOSOUDEUSE À DÉFILEMENT</div>
+    <div class="norm" id="hNorme">Selon NF EN ISO 11607</div>
+  </div>
+
+  <div id="certNotice"></div>
+
+  <section><h2><span class="n">01</span>Type de rapport</h2><div class="body">
+    <div class="typesel" id="typeSel"></div>
+    <div class="grid">
+      <div class="f"><label for="ri">N° de rapport (RI)</label><input id="ri" class="mono" placeholder="2026-S323">
+        <label class="prov"><input type="checkbox" id="riProv"> Numéro pas encore attribué : rapport provisoire</label></div>
+      <div class="f"><label for="date">Date d'intervention</label><input id="date" type="date"></div>
+    </div>
+  </div></section>
+
+  <section><h2><span class="n">02</span>Client</h2><div class="body grid">
+    <div class="f"><label for="client">Client</label><input id="client" placeholder="CH VIERZON"></div>
+    <div class="f"><label for="contact">Contact</label><input id="contact" placeholder="M. …"></div>
+    <div class="f"><label for="adresse">Adresse</label><input id="adresse"></div>
+    <div class="f"><label for="cpville">Code postal / Ville</label><input id="cpville" placeholder="18100 VIERZON"></div>
+  </div></section>
+
+  <section><h2><span class="n">03</span>Information machine</h2><div class="body grid">
+    <div class="f"><label for="fab">Fabricant</label><input id="fab" value="HAWO"></div>
+    <div class="f"><label for="modele">Modèle</label><input id="modele" class="mono" placeholder="HM3010DCV"></div>
+    <div class="f"><label for="sn">N° de série</label><input id="sn" class="mono" placeholder="438780"></div>
+    <div class="f"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
+    <div class="f"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
+    <div class="f"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
+  </div></section>
+
+  <section><h2><span class="n">04</span>Équipement de mesure utilisé</h2><div class="body">
+    <div id="eqList"></div>
+    <details id="eqDetails"><summary>Gérer les appareils enregistrés</summary>
+      <div class="mgr">
+        <div class="grid">
+          <div class="f"><label for="nNom">Nom de l'appareil</label><input id="nNom" placeholder="Thermomètre RS 1316"></div>
+          <div class="f"><label for="nSn">N° de série</label><input id="nSn" class="mono"></div>
+          <div class="f"><label for="nCert">N° de certificat</label><input id="nCert" class="mono"></div>
+          <div class="f"><label for="nEch">Échéance du certificat</label><input id="nEch" type="date"></div>
+        </div>
+        <div><button class="btn btn-line" id="btnAddEq" type="button">Enregistrer l'appareil</button> <span id="addMsg" class="lbl"></span></div>
+        <div id="mgrList" class="mgr"></div>
+      </div>
+    </details>
+  </div></section>
+
+  <section><h2><span class="n">05</span>Demande formulée</h2><div class="body grid">
+    <div class="f"><label for="defSig">Défaut signalé</label><select id="defSig"><option>PRÉVENTIF</option><option>CURATIF</option><option>AUTRE</option></select></div>
+    <div class="f"><label for="defCons">Défaut constaté</label><input id="defCons" value="Idem"></div>
+  </div></section>
+
+  <div id="dyn" style="display:grid;gap:14px"></div>
+
+  <section><h2><span class="n" id="nPho">09</span>Photos</h2><div class="body">
+    <div class="drop">
+      <label class="btn btn-line" for="photoIn">Prendre / ajouter des photos</label><input id="photoIn" type="file" accept="image/*" multiple>
+    </div>
+    <div id="photoList" class="thumbs"></div>
+    <div id="photoEmpty" class="empty">Aucune photo. Elles apparaîtront en annexe du PDF, deux par ligne, avec leur légende.</div>
+  </div></section>
+
+  <section><h2><span class="n" id="nDoc">10</span>Documents joints</h2><div class="body">
+    <div class="drop">
+      <label class="btn btn-line" for="docIn">Ajouter des documents</label><input id="docIn" type="file" multiple accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
+    </div>
+    <div id="docList"></div>
+    <div id="docEmpty" class="empty">Aucun document. Une image (scan, bon d'intervention photographié) est imprimée pleine page en annexe ; un PDF ou un fichier Office est intégré dans le PDF en pièce jointe.</div>
+  </div></section>
+
+  <section><h2><span class="n" id="nRem">09</span>Remarques / divers</h2><div class="body">
+    <textarea id="rem" rows="3">Remplacement des éléments d'usure inclus au préventif.</textarea>
+  </div></section>
+
+  <section><h2><span class="n" id="nConc">10</span>Conclusion</h2><div class="body">
+    <div class="row"><span class="t">Appareil conforme</span><div class="chips" data-key="conforme" data-set="ok"></div></div>
+    <div class="grid">
+      <div class="f"><label for="prochaine">Prochaine révision préconisée</label><input id="prochaine" type="month"></div>
+    </div>
+    <div class="sigs">
+      <div class="sig"><div class="sig-h"><span class="lbl">Signature technicien SAV</span><button class="link" data-clear="0" type="button">Effacer</button></div><canvas id="sig0"></canvas><input id="techNom" placeholder="Nom du technicien"></div>
+      <div class="sig"><div class="sig-h"><span class="lbl">Signature client</span><button class="link" data-clear="1" type="button">Effacer</button></div><canvas id="sig1"></canvas><input id="cliNom" placeholder="Nom du signataire client"></div>
+    </div>
+  </div></section>
+
+  <footer><span id="fTxt"><b>SSTI</b> – 6 rue des Mariniers 94290 VILLENEUVE LE ROI – Tél : 09 73 28 37 52<br>secretariat@ssti-tm.com</span>
+    <div><button class="link" type="button" id="admOpen">Modifier l'en-tête et le pied de page (administrateur)</button></div></footer>
+
+  <section id="admPanel" hidden><h2><span class="n">⚙</span>Administration – en-tête et pied de page</h2><div class="body">
+    <div id="admLock" class="grid">
+      <div class="f"><label for="admCode">Code administrateur</label><input id="admCode" type="password" autocomplete="off"></div>
+      <div class="f" style="align-content:end"><button class="btn btn-line" type="button" id="admUnlock">Déverrouiller</button></div>
+      <div id="admMsg" class="lbl" style="grid-column:1/-1"></div>
+    </div>
+    <div id="admEdit" hidden style="display:grid;gap:10px">
+      <div class="subh">En-tête</div>
+      <div class="grid">
+        <div class="f" style="grid-column:1/-1"><label for="cTitre">Titre du rapport</label><input id="cTitre"></div>
+        <div class="f"><label for="cNorme">Ligne norme</label><input id="cNorme"></div>
+      </div>
+      <div class="subh">Logo</div>
+      <div class="grid">
+        <div class="f"><span class="lbl">Image du logo (PNG ou JPG)</span><div class="drop"><label class="btn btn-line" for="cLogo">Choisir un logo</label><input id="cLogo" type="file" accept="image/*"><button class="btn btn-line" type="button" id="cLogoDel">Retirer le logo</button></div></div>
+        <div class="f"><label for="cLogoPos">Position</label><select id="cLogoPos"><option value="gauche">À gauche</option><option value="centre">Au centre</option><option value="droite">À droite</option></select></div>
+        <div class="f"><label for="cLogoW">Largeur du logo</label><div class="range"><input id="cLogoW" type="range" min="10" max="90" step="1"><output id="cLogoWv"></output></div></div>
+      </div>
+      <div class="subh">Pied de page</div>
+      <div class="grid">
+        <div class="f"><label for="cSociete">Société</label><input id="cSociete"></div>
+        <div class="f"><label for="cAdresse">Adresse</label><input id="cAdresse"></div>
+        <div class="f"><label for="cTel">Téléphone</label><input id="cTel"></div>
+        <div class="f"><label for="cEmail">E-mail</label><input id="cEmail"></div>
+      </div>
+      <div class="subh">Changer le code</div>
+      <div class="grid">
+        <div class="f"><label for="cNew1">Nouveau code (6 caractères minimum)</label><input id="cNew1" type="password" autocomplete="new-password"></div>
+        <div class="f"><label for="cNew2">Confirmer le nouveau code</label><input id="cNew2" type="password" autocomplete="new-password"></div>
+      </div>
+      <div class="drop">
+        <button class="btn btn-line" type="button" id="admSave">Enregistrer</button>
+        <button class="btn btn-line" type="button" id="admExport">Télécharger la version techniciens</button>
+        <button class="btn btn-line" type="button" id="admClose">Verrouiller</button>
+      </div>
+      <div class="empty">Les modifications s'appliquent tout de suite sur cet appareil. Pour les techniciens, téléchargez la version techniciens et remplacez l'ancien fichier (ou celui de l'appli en ligne) : l'en-tête, le pied de page et le code y sont intégrés.</div>
+    </div>
+  </div></section>
+</div></main>
+<div class="toast" id="toast" hidden></div>
+<script type="application/json" id="cfgData">{"titre": "RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE", "norme": "Selon NF EN ISO 11607", "societe": "SSTI", "adresse": "6 rue des Mariniers 94290 VILLENEUVE LE ROI", "tel": "09 73 28 37 52", "email": "secretariat@ssti-tm.com", "hash": "433bc52d169368d6be8a177634145c50028206dc1dd72de90397cb4a6701e4df"}</script>
+
+<script>
+/* MiniPDF : générateur PDF autonome (aucune connexion requise).
+   Sous-ensemble de l'API jsPDF utilisé par le rapport : unités en mm, format A4. */
+(function(root){
+const K=72/25.4,PW=210,PH=297;
+const WR={32:278,33:278,34:355,35:556,36:556,37:889,38:667,39:191,40:333,41:333,42:389,43:584,44:278,45:333,46:278,47:278,58:278,59:278,60:584,61:584,62:584,63:556,64:1015,65:667,66:667,67:722,68:722,69:667,70:611,71:778,72:722,73:278,74:500,75:667,76:556,77:833,78:722,79:778,80:667,81:778,82:722,83:667,84:611,85:722,86:667,87:944,88:667,89:667,90:611,91:278,92:278,93:278,94:469,95:556,96:333,97:556,98:556,99:500,100:556,101:556,102:278,103:556,104:556,105:222,106:222,107:500,108:222,109:833,110:556,111:556,112:556,113:556,114:333,115:500,116:278,117:556,118:500,119:722,120:500,121:500,122:500,123:334,124:260,125:334,126:584};
+const WB={32:278,33:333,34:474,35:556,36:556,37:889,38:722,39:238,40:333,41:333,42:389,43:584,44:278,45:333,46:278,47:278,58:333,59:333,60:584,61:584,62:584,63:611,64:975,65:722,66:722,67:722,68:722,69:667,70:611,71:778,72:722,73:278,74:556,75:722,76:611,77:833,78:722,79:778,80:667,81:778,82:722,83:667,84:611,85:722,86:667,87:944,88:667,89:667,90:611,91:333,92:278,93:333,94:584,95:556,96:333,97:556,98:611,99:556,100:611,101:556,102:333,103:611,104:611,105:278,106:278,107:556,108:278,109:889,110:611,111:611,112:611,113:611,114:389,115:556,116:333,117:611,118:556,119:778,120:556,121:556,122:500,123:389,124:280,125:389,126:584};
+for(let c=48;c<58;c++){WR[c]=556;WB[c]=556}
+/* Caractères accentués : même largeur que la lettre de base */
+const BASE={'à':'a','â':'a','ä':'a','á':'a','ç':'c','é':'e','è':'e','ê':'e','ë':'e','î':'i','ï':'i','í':'i','ô':'o','ö':'o','ó':'o','ù':'u','û':'u','ü':'u','ú':'u','ÿ':'y','ñ':'n','œ':'o','À':'A','Â':'A','Ä':'A','Ç':'C','É':'E','È':'E','Ê':'E','Ë':'E','Î':'I','Ï':'I','Ô':'O','Ö':'O','Ù':'U','Û':'U','Ü':'U','Ñ':'N'};
+const SPECIAL={'°':400,'±':584,'–':556,'—':1000,'·':278,'«':556,'»':556,'’':222,'‘':222,'“':333,'”':333,'…':1000,'€':556,'×':584,'µ':556,'²':333,'³':333,'œ':944,'Œ':1000};
+const WIN={0x20AC:0x80,0x201A:0x82,0x2026:0x85,0x2020:0x86,0x2030:0x89,0x2039:0x8B,0x0152:0x8C,0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x2122:0x99,0x203A:0x9B,0x0153:0x9C,0x0178:0x9F};
+function cw(ch,bold){const t=bold?WB:WR,c=ch.charCodeAt(0);if(t[c])return t[c];
+  if(SPECIAL[ch]){let w=SPECIAL[ch];if(bold&&ch==='’')w=278;return w}
+  const b=BASE[ch];if(b)return t[b.charCodeAt(0)];return 556}
+function enc(s){let o='';for(const ch of s){let c=ch.codePointAt(0);if(WIN[c])c=WIN[c];else if(c>255)c=63;
+  const x=String.fromCharCode(c);o+=(x==='('||x===')'||x==='\\')?'\\'+x:(c<32||c>126)?'\\'+c.toString(8).padStart(3,'0'):x}return o}
+function f(n){return (Math.round(n*1000)/1000).toString()}
+function rgb(a){if(a.length===1){const g=a[0]/255;return[g,g,g]}return[a[0]/255,a[1]/255,a[2]/255]}
+
+function MiniPDF(){this.pages=[];this.cur=null;this.font='helvetica';this.style='normal';this.size=12;
+  this.tc=[0,0,0];this.fc=[0,0,0];this.dc=[0,0,0];this.lw=0.2;this.images=[];this.gs=[];this.files=[];this.annots=[];this.addPage()}
+const P=MiniPDF.prototype;
+P.addPage=function(){this.cur=[];this.pages.push(this.cur);this.cur.push(f(this.lw*K)+' w');return this};
+P.getNumberOfPages=function(){return this.pages.length};
+P.setPage=function(i){this.cur=this.pages[i-1];return this};
+P.setFont=function(n,s){this.font=n||'helvetica';if(s)this.style=s;return this};
+P.setFontSize=function(s){this.size=s;return this};
+P.setTextColor=function(...a){this.tc=rgb(a);return this};
+P.setFillColor=function(...a){this.fc=rgb(a);return this};
+P.setDrawColor=function(...a){this.dc=rgb(a);return this};
+P.setLineWidth=function(w){this.lw=w;this.cur.push(f(w*K)+' w');return this};
+P.fkey=function(){return this.style==='bold'?'F2':this.style==='italic'?'F3':'F1'};
+P.getTextWidth=function(s){const b=this.style==='bold';let w=0;for(const ch of String(s))w+=cw(ch,b);return w/1000*this.size/K};
+P.splitTextToSize=function(text,maxW){const out=[];String(text).split('\n').forEach(par=>{
+  const words=par.split(/ +/);let line='';
+  words.forEach(wd=>{const test=line?line+' '+wd:wd;
+    if(this.getTextWidth(test)<=maxW||!line){if(this.getTextWidth(test)>maxW&&!line){/* mot trop long : coupe */let part='';for(const ch of wd){if(this.getTextWidth(part+ch)>maxW&&part){out.push(part);part=''}part+=ch}line=part}else line=test}
+    else{out.push(line);line=wd;if(this.getTextWidth(line)>maxW){let part='';for(const ch of wd){if(this.getTextWidth(part+ch)>maxW&&part){out.push(part);part=''}part+=ch}line=part}}});
+  out.push(line)});return out};
+P.text=function(t,x,y,o){o=o||{};const lines=Array.isArray(t)?t:String(t).split('\n');const lh=this.size*(o.lineHeightFactor||1.15)/K;
+  const ang=(o.angle||0)*Math.PI/180,ca=Math.cos(ang),sa=Math.sin(ang);
+  lines.forEach((ln,i)=>{const w=this.getTextWidth(ln);let dx=0;if(o.align==='center')dx=-w/2;else if(o.align==='right')dx=-w;
+    const bx=x+dx*ca,by=y+i*lh-dx*sa;
+    const X=bx*K,Y=(PH-by)*K;
+    this.cur.push(`BT /${this.fkey()} ${f(this.size)} Tf ${this.tc.map(f).join(' ')} rg ${f(ca)} ${f(sa)} ${f(-sa)} ${f(ca)} ${f(X)} ${f(Y)} Tm (${enc(ln)}) Tj ET`)});return this};
+P.paint=function(st){const s=(st||'S').toUpperCase();
+  const fill=`${this.fc.map(f).join(' ')} rg`,str=`${this.dc.map(f).join(' ')} RG`;
+  if(s==='F')return fill+' f';if(s==='FD'||s==='DF')return fill+' '+str+' B';return str+' S'};
+P.rect=function(x,y,w,h,st){this.cur.push(`${f(x*K)} ${f((PH-y-h)*K)} ${f(w*K)} ${f(h*K)} re ${this.paint(st)}`);return this};
+P.roundedRect=function(x,y,w,h,rx,ry,st){const r=Math.min(rx,w/2,h/2),k=0.5523*r,X=v=>f(v*K),Y=v=>f((PH-v)*K);
+  const p=[`${X(x+r)} ${Y(y)} m`,`${X(x+w-r)} ${Y(y)} l`,`${X(x+w-r+k)} ${Y(y)} ${X(x+w)} ${Y(y+r-k)} ${X(x+w)} ${Y(y+r)} c`,
+   `${X(x+w)} ${Y(y+h-r)} l`,`${X(x+w)} ${Y(y+h-r+k)} ${X(x+w-r+k)} ${Y(y+h)} ${X(x+w-r)} ${Y(y+h)} c`,`${X(x+r)} ${Y(y+h)} l`,
+   `${X(x+r-k)} ${Y(y+h)} ${X(x)} ${Y(y+h-r+k)} ${X(x)} ${Y(y+h-r)} c`,`${X(x)} ${Y(y+r)} l`,`${X(x)} ${Y(y+r-k)} ${X(x+r-k)} ${Y(y)} ${X(x+r)} ${Y(y)} c`];
+  this.cur.push(p.join(' ')+' h '+this.paint(st));return this};
+P.line=function(x1,y1,x2,y2){this.cur.push(`${this.dc.map(f).join(' ')} RG ${f(x1*K)} ${f((PH-y1)*K)} m ${f(x2*K)} ${f((PH-y2)*K)} l S`);return this};
+/* Image JPEG (data URL) */
+P.addImage=function(dataUrl,fmt,x,y,w,h){const b64=dataUrl.split(',')[1],bin=atob(b64),bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  let i=2,W=0,H=0;while(i<bytes.length){if(bytes[i]!==0xFF){i++;continue}const m=bytes[i+1];
+    if(m>=0xC0&&m<=0xCF&&m!==0xC4&&m!==0xC8&&m!==0xCC){H=bytes[i+5]<<8|bytes[i+6];W=bytes[i+7]<<8|bytes[i+8];break}
+    i+=2+(bytes[i+2]<<8|bytes[i+3])}
+  const name='Im'+(this.images.length+1);this.images.push({name,bytes,W,H});
+  this.cur.push(`q ${f(w*K)} 0 0 ${f(h*K)} ${f(x*K)} ${f((PH-y-h)*K)} cm /${name} Do Q`);return this};
+/* Document joint intégré au PDF (icône trombone) */
+P.attachFile=function(name,bytes,mime,x,y){const i=this.files.length;this.files.push({name,bytes,mime:mime||'application/octet-stream'});
+  if(x!=null)this.annots.push({page:this.pages.indexOf(this.cur),file:i,x,y});return this};
+P.GState=function(o){this.opacity=o.opacity};
+P.setGState=function(g){const n='GS'+(this.gs.length+1);this.gs.push(g.opacity);this.cur.push(`/${n} gs`);return this};
+P.saveGraphicsState=function(){this.cur.push('q');return this};
+P.restoreGraphicsState=function(){this.cur.push('Q');return this};
+P.output=function(kind){
+  const te=new TextEncoder(),chunks=[],offs=[];let len=0;
+  const raw=s=>{const b=typeof s==='string'?latin(s):s;chunks.push(b);len+=b.length};
+  function latin(s){const b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i)&255;return b}
+  const objs=[];const add=()=>objs.push(null)&&objs.length;/* numéro d'objet */
+  const nCat=add(),nPages=add(),nF1=add(),nF2=add(),nF3=add();
+  const gsN=this.gs.map(()=>add()),imN=this.images.map(()=>add());
+  const efN=this.files.map(()=>add()),fsN=this.files.map(()=>add()),anN=this.annots.map(()=>add());
+  const pageN=this.pages.map(()=>[add(),add()]);
+  const body={};
+  const names=this.files.length?` /Names << /EmbeddedFiles << /Names [${this.files.map((F,i)=>`(${String(i+1).padStart(3,'0')} ${enc(F.name)}) ${fsN[i]} 0 R`).join(' ')}] >> >> /PageMode /UseAttachments`:'';
+  body[nCat]=`<< /Type /Catalog /Pages ${nPages} 0 R${names} >>`;
+  body[nPages]=`<< /Type /Pages /Kids [${pageN.map(p=>p[0]+' 0 R').join(' ')}] /Count ${pageN.length} >>`;
+  [[nF1,'Helvetica'],[nF2,'Helvetica-Bold'],[nF3,'Helvetica-Oblique']].forEach(([n,b])=>body[n]=`<< /Type /Font /Subtype /Type1 /BaseFont /${b} /Encoding /WinAnsiEncoding >>`);
+  this.gs.forEach((o,i)=>body[gsN[i]]=`<< /Type /ExtGState /ca ${o} /CA ${o} >>`);
+  this.files.forEach((F,i)=>body[fsN[i]]=`<< /Type /Filespec /F (${enc(F.name)}) /UF (${enc(F.name)}) /EF << /F ${efN[i]} 0 R >> /Desc (${enc(F.name)}) >>`);
+  this.annots.forEach((A,i)=>body[anN[i]]=`<< /Type /Annot /Subtype /FileAttachment /Rect [${f(A.x*K)} ${f((PH-A.y-6)*K)} ${f((A.x+5)*K)} ${f((PH-A.y)*K)}] /FS ${fsN[A.file]} 0 R /Contents (${enc(this.files[A.file].name)}) /Name /Paperclip /F 4 >>`);
+  const res=`<< /Font << /F1 ${nF1} 0 R /F2 ${nF2} 0 R /F3 ${nF3} 0 R >>`+
+    (this.gs.length?` /ExtGState << ${this.gs.map((o,i)=>`/GS${i+1} ${gsN[i]} 0 R`).join(' ')} >>`:'')+
+    (this.images.length?` /XObject << ${this.images.map((im,i)=>`/${im.name} ${imN[i]} 0 R`).join(' ')} >>`:'')+' >>';
+  raw('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  for(let n=1;n<=objs.length;n++){offs[n]=len;raw(n+' 0 obj\n');
+    const im=imN.indexOf(n),pg=pageN.findIndex(p=>p[0]===n),ct=pageN.findIndex(p=>p[1]===n),ef=efN.indexOf(n);
+    if(im>=0){const I=this.images[im];raw(`<< /Type /XObject /Subtype /Image /Width ${I.W} /Height ${I.H} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${I.bytes.length} >>\nstream\n`);raw(I.bytes);raw('\nendstream')}
+    else if(ef>=0){const F=this.files[ef];raw(`<< /Type /EmbeddedFile /Subtype /${F.mime.replace(/[^a-zA-Z0-9.+-]/g,c=>'#'+c.charCodeAt(0).toString(16).padStart(2,'0'))} /Length ${F.bytes.length} /Params << /Size ${F.bytes.length} >> >>\nstream\n`);raw(F.bytes);raw('\nendstream')}
+    else if(pg>=0){const an=this.annots.map((A,i)=>A.page===pg?anN[i]+' 0 R':'').filter(Boolean);
+      raw(`<< /Type /Page /Parent ${nPages} 0 R /MediaBox [0 0 ${f(PW*K)} ${f(PH*K)}] /Resources ${res} /Contents ${pageN[pg][1]} 0 R${an.length?' /Annots ['+an.join(' ')+']':''} >>`)}
+    else if(ct>=0){const s=latin(this.pages[ct].join('\n'));raw(`<< /Length ${s.length} >>\nstream\n`);raw(s);raw('\nendstream')}
+    else raw(body[n]);
+    raw('\nendobj\n')}
+  const xref=len;let x=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;
+  for(let n=1;n<=objs.length;n++)x+=String(offs[n]).padStart(10,'0')+' 00000 n \n';
+  raw(x+`trailer\n<< /Size ${objs.length+1} /Root ${nCat} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  const out=new Uint8Array(len);let p=0;chunks.forEach(c=>{out.set(c,p);p+=c.length});
+  if(kind==='arraybuffer')return out.buffer;return new Blob([out],{type:'application/pdf'})};
+root.MiniPDF=MiniPDF;
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+<script>
+const $=id=>document.getElementById(id);
+/* Réglages verrouillés par code : modifiables uniquement par l'administrateur */
+const CONFIG_DEFAUT=JSON.parse(document.getElementById('cfgData').textContent);
+let CFG=(()=>{try{const v=JSON.parse(localStorage.getItem('ssti_cfg'));if(v&&v.hash)return {...CONFIG_DEFAUT,...v}}catch(e){}return {...CONFIG_DEFAUT}})();
+function sha256(str){const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const b=new TextEncoder().encode(str),l=b.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);m.set(b);m[l]=0x80;const dv=new DataView(m.buffer);dv.setUint32(n-4,l*8);dv.setUint32(n-8,Math.floor(l/0x20000000));
+  let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];const w=new Uint32Array(64),r=(x,k)=>x>>>k|x<<(32-k);
+  for(let o=0;o<n;o+=64){for(let i=0;i<16;i++)w[i]=dv.getUint32(o+i*4);for(let i=16;i<64;i++){const s0=r(w[i-15],7)^r(w[i-15],18)^w[i-15]>>>3,s1=r(w[i-2],17)^r(w[i-2],19)^w[i-2]>>>10;w[i]=w[i-16]+s0+w[i-7]+s1|0}
+    let[a,bb,c,d,e,f,g,hh]=H;for(let i=0;i<64;i++){const t1=hh+(r(e,6)^r(e,11)^r(e,25))+(e&f^~e&g)+K[i]+w[i]|0,t2=(r(a,2)^r(a,13)^r(a,22))+(a&bb^a&c^bb&c)|0;hh=g;g=f;f=e;e=d+t1|0;d=c;c=bb;bb=a;a=t1+t2|0}
+    H=H.map((x,i)=>x+[a,bb,c,d,e,f,g,hh][i]|0)}
+  return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('')}
+const hashCode=c=>sha256('ssti-rapport:'+c);
+function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=false;L.style.width=(CFG.logoW||35)+'mm';
+    L.style.justifySelf={gauche:'start',centre:'center',droite:'end'}[CFG.logoPos||'gauche']}else{L.hidden=true;L.removeAttribute('src')}
+  $('hTitre').textContent=CFG.titre;$('hNorme').textContent=CFG.norme;
+  $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`}
+function footerLine(){return `${CFG.societe} – ${CFG.adresse} – Tél : ${CFG.tel} – ${CFG.email}`}
+const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email'};
+let admTries=0,admUntil=0;
+const SETS={chk:[['Contrôlé','c'],['Remplacé','r'],['N/A','n']],yn:[['Oui','c'],['Non','k']],ok:[['Conforme','c'],['Non conforme','k']]};
+const TYPES={
+ defil:{nom:'Thermosoudeuse à défilement',ex:'ex. HM3010DCV',titre:'THERMOSOUDEUSE À DÉFILEMENT',
+  sections:[
+   ["Contrôles d'intégrité / remplacement",'chk',['Inspection visuelle','Nettoyage interne de la machine','Courroies de transfert','Téflons fers chauffants','Téflons protection courroie','Galet synthétique']],
+   ['Pièces de 2e et 3e niveau','chk',['Ressort de pression de défilement','Ressort de pression galet','Poulies / galets','Bloc inférieur','Bloc inférieur de soudure','Sonde de température','Moteur principal']],
+   ['Contrôles','yn',['Vérification température','Étalonnage machine température','Qualité de soudure + SEALCHECK','Vérification de la pression']]],
+  champs:[["Type d'emballage",'BOP',''],['T° consigne (°C)','180','°C'],['T° mesurée 1 (°C, ±2 %)','','°C'],['T° mesurée 2 (°C)','','°C'],['T° mesurée 3 (°C)','','°C'],['Pression consigne (N, ±20 %)','100','N'],['Pression mesurée en charge (N)','','N'],['Vitesse de scellage (m/min)','','m/min']]},
+ impul:{nom:'Thermosoudeuse impulsion',ex:'ex. HM660ASV',titre:'THERMOSOUDEUSE IMPULSION',
+  sections:[
+   ['Contrôle qualité / interventions','chk',['Inspection visuelle','Mise en route, contrôle autotest','Contrôle du clavier','Nettoyage interne de la soudeuse','Téflons mâchoire supérieure','Téflons mâchoire inférieure','Ruban de chauffe supérieur','Ruban de chauffe inférieur','Contrôle et calibration T° ambiante','Contrôle pression de scellage','Contrôle du système de coupe']],
+   ['Réglage et contrôle final','yn',['Synchronisation électrique (système zéro)','Contrôle visuel intégrité soudure']]],
+  champs:[["Type d'emballage",'ULTRA',''],['TS consigne (°C, ±3 °C)','145','°C'],['TS mesurée (°C)','','°C'],['ts – temps de soudure (s)','2','s'],['tc – temps de refroidissement (s)','3','s'],['T° ambiante (°C)','','°C'],['Pression de scellage (N)','','N']]}
+};
+const DEF_EQ=[
+ {id:'e1',n:'Thermomètre RS 1316',s:'160203433',c:'2604132601',e:''},
+ {id:'e2',n:'Dynamomètre FGV-100XY',s:'Y9525H047',c:'CEFTC26090014',e:''},
+ {id:'e3',n:'Tachymètre PCET236',s:'N1016506',c:'VTF26-12763',e:''}];
+function load(){try{const v=JSON.parse(localStorage.getItem('ssti_eq'));if(Array.isArray(v))return v}catch(e){}return DEF_EQ.map(x=>({...x}))}
+function save(){try{localStorage.setItem('ssti_eq',JSON.stringify(EQ))}catch(e){}}
+let EQ=load(), type='defil', sel=new Set(), choices={};
+
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,3200)}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtD(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return d?`${d}.${m}.${y}`:`${m}.${y}`}
+
+/* Statut d'un certificat : alerte à 31 jours ou moins */
+function status(e){
+  if(!e.e)return{k:'na',txt:'Échéance non renseignée'};
+  const today=new Date();today.setHours(0,0,0,0);
+  const j=Math.round((new Date(e.e+'T00:00:00')-today)/864e5);
+  if(j<0)return{k:'bad',txt:`Certificat expiré le ${fmtD(e.e)}`};
+  if(j<=31)return{k:'warn',txt:`Échéance le ${fmtD(e.e)} – dans ${j} j`};
+  return{k:'ok',txt:`Valide jusqu'au ${fmtD(e.e)}`};
+}
+function renderNotice(){
+  const exp=EQ.filter(e=>status(e).k==='bad'),soon=EQ.filter(e=>status(e).k==='warn'),none=EQ.filter(e=>!e.e);
+  let h='';
+  if(exp.length)h+=`<div class="notice bad"><b>Certificat expiré</b>${exp.map(e=>`<span>${esc(e.n)} – ${status(e).txt}</span>`).join('')}</div>`;
+  if(soon.length)h+=`<div class="notice warn"><b>Certificat à renouveler dans le mois</b>${soon.map(e=>`<span>${esc(e.n)} – ${status(e).txt}</span>`).join('')}</div>`;
+  if(none.length&&!exp.length&&!soon.length)h+=`<div class="notice warn"><span>${none.length} appareil(s) sans date d'échéance de certificat. Renseignez-la dans « Gérer les appareils enregistrés ».</span></div>`;
+  $('certNotice').innerHTML=h;$('certNotice').style.display=h?'grid':'none';$('certNotice').style.gap='8px';
+}
+function renderEq(){
+  $('eqList').innerHTML=EQ.length?EQ.map(e=>{const s=status(e);return `<label class="eq"><input type="checkbox" data-eq="${e.id}" ${sel.has(e.id)?'checked':''}><span class="d"><b>${esc(e.n)}</b><span class="meta">Sn° ${esc(e.s)} · cert. n° ${esc(e.c)}</span><span class="pill ${s.k}">${s.txt}</span></span></label>`}).join(''):'<span class="lbl">Aucun appareil enregistré.</span>';
+  $('mgrList').innerHTML=EQ.map(e=>`<div class="mgr-item"><span class="nm">${esc(e.n)} <span class="meta mono" style="font-weight:400;color:var(--muted)">${esc(e.s)}</span></span>
+    <div class="f"><label for="ech_${e.id}">Échéance du certificat</label><input type="date" id="ech_${e.id}" data-ech="${e.id}" value="${esc(e.e)}"></div>
+    <button class="btn btn-line" type="button" data-del="${e.id}">Supprimer</button></div>`).join('');
+  renderNotice();
+}
+$('eqList').addEventListener('change',ev=>{const id=ev.target.dataset.eq;if(!id)return;ev.target.checked?sel.add(id):sel.delete(id)});
+$('mgrList').addEventListener('change',ev=>{const id=ev.target.dataset.ech;if(!id)return;EQ.find(e=>e.id===id).e=ev.target.value;save();renderEq()});
+$('mgrList').addEventListener('click',ev=>{const b=ev.target.closest('[data-del]');if(!b)return;
+  if(b.dataset.armed){EQ=EQ.filter(e=>e.id!==b.dataset.del);sel.delete(b.dataset.del);save();renderEq();toast('Appareil supprimé')}
+  else{b.dataset.armed=1;b.textContent='Confirmer la suppression';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Supprimer'}},4000)}});
+$('btnAddEq').onclick=()=>{const n=$('nNom').value.trim();if(!n){$('addMsg').textContent='Le nom de l\'appareil est obligatoire.';return}
+  EQ.push({id:'e'+Date.now(),n,s:$('nSn').value.trim(),c:$('nCert').value.trim(),e:$('nEch').value});save();
+  ['nNom','nSn','nCert','nEch'].forEach(i=>$(i).value='');$('addMsg').textContent='';renderEq();toast('Appareil enregistré')};
+
+/* Choix type QCM */
+function chipsHTML(key,set){return SETS[set].map(([t,c])=>`<button type="button" class="chip ${c}" data-k="${esc(key)}" data-v="${t}" aria-pressed="${choices[key]===t}">${t}</button>`).join('')}
+document.addEventListener('click',ev=>{const b=ev.target.closest('.chip');if(!b)return;const k=b.dataset.k,v=b.dataset.v;
+  choices[k]=choices[k]===v?undefined:v;b.parentNode.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[k]===x.dataset.v))});
+
+/* SEALCHECK : peut être barré quand l'emballage ne permet pas le test */
+function labelHTML(i){if(!i.includes('SEALCHECK'))return esc(i);const off=!!choices.sealNA;
+  return esc(i.replace('SEALCHECK',''))+`<span class="${off?'seal-off':''}">SEALCHECK</span><button type="button" class="seal-btn" id="sealBtn" aria-pressed="${off}">${off?'SEALCHECK non réalisable':'Barrer SEALCHECK'}</button>`}
+document.addEventListener('click',ev=>{const b=ev.target.closest('#sealBtn');if(!b)return;choices.sealNA=!choices.sealNA;
+  b.parentNode.innerHTML=labelHTML('Qualité de soudure + SEALCHECK')});
+function renderType(){
+  $('typeSel').innerHTML=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typecard" data-type="${k}" aria-pressed="${k===type}"><b>${t.nom}</b><span>${t.ex}</span></button>`).join('');
+  const t=TYPES[type];$('headType').textContent=t.titre;
+  let n=6,h='';
+  t.sections.forEach(([nom,set,items])=>{h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}</h2><div class="body" style="gap:0">`+
+    items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
+  h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body grid">`+
+    t.champs.map(([l,v],i)=>`<div class="f"><label for="m_${type}_${i}">${esc(l)}</label><input id="m_${type}_${i}" class="mono" value="${esc(v)}" inputmode="${i?'decimal':'text'}"></div>`).join('')+'</div></section>';
+  $('dyn').innerHTML=h;['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
+}
+$('typeSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-type]');if(!b||b.dataset.type===type)return;type=b.dataset.type;renderType()});
+document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');
+/* Numéro provisoire : AAAA-S provisoire tant que le numéro définitif n'est pas connu */
+let riSaved='';
+function provYear(){return (($('date').value||'').slice(0,4))||String(new Date().getFullYear())}
+function isProv(){return $('riProv').checked}
+function riVal(){return isProv()?provYear()+'-S provisoire':$('ri').value.trim()}
+function syncRi(){if(isProv()){$('ri').value=provYear()+'-S provisoire';$('ri').readOnly=true}else{$('ri').readOnly=false}
+  $('barRi').textContent='RI n° '+(riVal()||'—')}
+$('riProv').addEventListener('change',()=>{if(isProv())riSaved=$('ri').value;else $('ri').value=riSaved;syncRi()});
+$('date').addEventListener('change',syncRi);
+$('ri').addEventListener('input',syncRi);
+
+/* Signatures */
+const pads=[0,1].map(i=>{const c=$('sig'+i),x=c.getContext('2d');let down=false,used=false;
+  function fit(){const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;if(!r.width)return;const img=used?c.toDataURL():null;
+    c.width=r.width*d;c.height=r.height*d;x.setTransform(d,0,0,d,0,0);x.fillStyle='#ffffff';x.fillRect(0,0,r.width,r.height);
+    x.lineWidth=2;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#111111';
+    if(img){const im=new Image();im.onload=()=>x.drawImage(im,0,0,r.width,r.height);im.src=img}}
+  const p=e=>{const r=c.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
+  c.addEventListener('pointerdown',e=>{down=true;used=true;c.setPointerCapture(e.pointerId);x.beginPath();x.moveTo(...p(e))});
+  c.addEventListener('pointermove',e=>{if(!down)return;x.lineTo(...p(e));x.stroke()});
+  ['pointerup','pointercancel'].forEach(t=>c.addEventListener(t,()=>down=false));
+  fit();new ResizeObserver(fit).observe(c);
+  return{c,clear(){used=false;fit()},get used(){return used}}});
+document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>pads[+b.dataset.clear].clear());
+
+/* Nouveau rapport (confirmation dans la page) */
+$('btnReset').onclick=function(){const b=this;
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='Confirmer : tout effacer';setTimeout(()=>{delete b.dataset.armed;b.textContent='Nouveau rapport'},4000);return}
+  delete b.dataset.armed;b.textContent='Nouveau rapport';
+  document.querySelectorAll('main input:not([type=checkbox]):not([id^=n]):not([id^=ech_])').forEach(i=>{if(!i.closest('#dyn'))i.value=''});
+  $('fab').value='HAWO';$('defCons').value='Idem';$('defSig').selectedIndex=0;$('rem').value="Remplacement des éléments d'usure inclus au préventif.";
+  $('date').value=new Date().toISOString().slice(0,10);choices={};sel.clear();pads.forEach(p=>p.clear());PHOTOS=[];DOCS=[];renderMedia();
+  renderType();renderEq();document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');$('riProv').checked=false;riSaved='';syncRi();
+  window.scrollTo({top:0});toast('Formulaire vidé')};
+
+/* Photos et documents (gardés en mémoire pour le rapport en cours) */
+let PHOTOS=[],DOCS=[];
+const isImg=f=>/^image\//.test(f.type)||/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(f.name);
+function toJpeg(file,max){return new Promise((ok,ko)=>{const url=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{let w=im.naturalWidth,h=im.naturalHeight;const r=Math.min(1,max/Math.max(w,h));w=Math.round(w*r);h=Math.round(h*r);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);
+    URL.revokeObjectURL(url);ok({src:c.toDataURL('image/jpeg',0.82),w,h})};
+  im.onerror=()=>{URL.revokeObjectURL(url);ko(new Error('format'))};im.src=url})}
+function kb(n){return n>1048576?(n/1048576).toFixed(1)+' Mo':Math.max(1,Math.round(n/1024))+' ko'}
+function renderMedia(){
+  $('photoList').innerHTML=PHOTOS.map((p,i)=>`<figure class="thumb" style="margin:0"><img src="${p.src}" alt="Photo ${i+1}"><div class="ti">
+    <input id="cap_${p.id}" data-cap="${p.id}" placeholder="Légende (ex. téflon usé)" value="${esc(p.cap)}"><button class="btn btn-line" type="button" data-delp="${p.id}">Retirer</button></div></figure>`).join('');
+  $('photoEmpty').hidden=PHOTOS.length>0;
+  $('docList').innerHTML=DOCS.map(d=>`<div class="doc"><span class="d"><b>${esc(d.name)}</b><span>${d.img?'Image – imprimée pleine page en annexe':'Intégré en pièce jointe du PDF'} · ${kb(d.size)}</span></span>
+    <button class="btn btn-line" type="button" data-deld="${d.id}">Retirer</button></div>`).join('');
+  $('docEmpty').hidden=DOCS.length>0}
+$('photoIn').addEventListener('change',async ev=>{const fs=[...ev.target.files];ev.target.value='';let bad=0;
+  for(const f of fs){try{const j=await toJpeg(f,1600);PHOTOS.push({id:'p'+Date.now()+Math.random().toString(36).slice(2,6),cap:'',...j})}catch(e){bad++}}
+  renderMedia();toast(bad?`${bad} photo(s) illisible(s) par ce navigateur.`:`${fs.length} photo(s) ajoutée(s)`)});
+$('docIn').addEventListener('change',async ev=>{const fs=[...ev.target.files];ev.target.value='';
+  for(const f of fs){const id='d'+Date.now()+Math.random().toString(36).slice(2,6);
+    if(isImg(f)){try{const j=await toJpeg(f,2000);DOCS.push({id,name:f.name,size:f.size,img:true,...j});continue}catch(e){}}
+    DOCS.push({id,name:f.name,size:f.size,img:false,mime:f.type||'application/octet-stream',bytes:new Uint8Array(await f.arrayBuffer())})}
+  renderMedia();toast(`${fs.length} document(s) ajouté(s)`)});
+document.addEventListener('input',ev=>{const id=ev.target.dataset?.cap;if(id){const p=PHOTOS.find(x=>x.id===id);if(p)p.cap=ev.target.value}});
+document.addEventListener('click',ev=>{const a=ev.target.closest('[data-delp],[data-deld]');if(!a)return;
+  if(a.dataset.delp)PHOTOS=PHOTOS.filter(p=>p.id!==a.dataset.delp);else DOCS=DOCS.filter(d=>d.id!==a.dataset.deld);renderMedia()});
+
+/* PDF */
+function buildPdf(){
+  const doc=new MiniPDF();
+  const W=210,M=14,CW=W-2*M,NAVY=[29,79,122];let y=14;
+  const v=id=>($(id).value||'').trim();
+  function pageCheck(h){if(y+h>282){doc.addPage();y=16}}
+  function band(t){pageCheck(14);doc.setFillColor(...NAVY);doc.rect(M,y,CW,6.5,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(t.toUpperCase(),M+2,y+4.5);doc.setTextColor(20);y+=8.5}
+  /* Libellé et valeur dans deux colonnes séparées, passage à la ligne si le texte est long */
+  function kv(pairs){doc.setFontSize(9.5);const colW=CW/2,LW=44,VX=LW+3,LH=4.2;
+    for(let i=0;i<pairs.length;i+=2){
+      const cells=[pairs[i],pairs[i+1]].map(p=>p&&{l:doc.splitTextToSize(p[0],LW),v:doc.splitTextToSize(String(p[1]||'—'),colW-VX-3)});
+      const lines=Math.max(...cells.map(c=>c?Math.max(c.l.length,c.v.length):1)),h=lines*LH+2.6;pageCheck(h+1);
+      cells.forEach((c,j)=>{if(!c)return;const x=M+j*colW;
+        doc.setFont('helvetica','normal');doc.setTextColor(95);doc.text(c.l,x+1,y+3.5,{lineHeightFactor:1.25});
+        doc.setFont('helvetica','bold');doc.setTextColor(20);doc.text(c.v,x+VX,y+3.5,{lineHeightFactor:1.25})});
+      doc.setDrawColor(215);doc.line(M,y+h-0.6,M+CW,y+h-0.6);y+=h+0.4}}
+  function status(label,val){pageCheck(7);doc.setFontSize(9.5);doc.setFont('helvetica','normal');doc.setTextColor(20);
+    if(label.includes('SEALCHECK')&&choices.sealNA){const pre=label.slice(0,label.indexOf('SEALCHECK')),x0=M+1+doc.getTextWidth(pre),w=doc.getTextWidth('SEALCHECK');
+      doc.text(pre,M+1,y+3.5);doc.setTextColor(120);doc.text('SEALCHECK',x0,y+3.5);doc.setDrawColor(40);doc.setLineWidth(0.4);doc.line(x0-0.5,y+2.3,x0+w+0.5,y+2.3);doc.setLineWidth(0.2);
+      doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.text('(non réalisable selon emballage)',x0+w+2,y+3.5);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(20)}
+    else doc.text(doc.splitTextToSize(label,CW-48)[0],M+1,y+3.5);
+    const col={'Contrôlé':[44,122,63],'Oui':[44,122,63],'Conforme':[44,122,63],'Remplacé':[31,98,176],'N/A':[110,116,128],'Non':[179,38,30],'Non conforme':[179,38,30]}[val];
+    if(val){doc.setFillColor(...col);doc.roundedRect(M+CW-40,y,39,5,1.5,1.5,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text(val,M+CW-20.5,y+3.6,{align:'center'})}
+    else{doc.setTextColor(150);doc.setFontSize(8.5);doc.text('non renseigné',M+CW-20.5,y+3.6,{align:'center'})}
+    doc.setDrawColor(225);doc.line(M,y+6,M+CW,y+6);y+=7}
+
+  const t=TYPES[type];
+  if(CFG.logo){const L=$('hLogo'),nw=L.naturalWidth||1,nh=L.naturalHeight||1;let lw=Math.min(CFG.logoW||35,CW),lh=lw*nh/nw;if(lh>40){lh=40;lw=lh*nw/nh}
+    const lx={gauche:M,centre:(W-lw)/2,droite:M+CW-lw}[CFG.logoPos||'gauche'];doc.addImage(CFG.logo,'JPEG',lx,8,lw,lh);y=8+lh+6}
+  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(20);
+  doc.splitTextToSize(CFG.titre,CW).forEach(l=>{doc.text(l,W/2,y,{align:'center'});y+=6});
+  doc.setTextColor(...NAVY);doc.setFontSize(11);doc.text(t.titre,W/2,y,{align:'center'});y+=5;
+  doc.setTextColor(95);doc.setFont('helvetica','normal');doc.setFontSize(9);if(CFG.norme)doc.text(CFG.norme,W/2,y,{align:'center'});y+=6;
+  doc.setTextColor(20);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text('RI n° : '+(riVal()||'—'),M,y);
+  doc.text("Date d'intervention : "+(fmtD(v('date'))||'—'),M+CW,y,{align:'right'});y+=5;
+  if(isProv()){doc.setFillColor(253,240,225);doc.setDrawColor(180,91,8);doc.roundedRect(M,y,CW,8,1.5,1.5,'FD');doc.setTextColor(180,91,8);doc.setFontSize(9.5);
+    doc.text('RAPPORT PROVISOIRE – le rapport définitif, avec son numéro, sera transmis ultérieurement.',W/2,y+5.2,{align:'center'});doc.setTextColor(20);y+=11}
+
+  band('Client');kv([['Client',v('client')],['Contact',v('contact')],['Adresse',v('adresse')],['CP / Ville',v('cpville')]]);
+  band('Information machine');kv([['Fabricant',v('fab')],['Modèle',v('modele')],['N° de série',v('sn')],['Version software',v('soft')],['Date de fabrication',v('dfab')],['Compteur',v('compteur')]]);
+  band('Équipement de mesure');const used=EQ.filter(e=>sel.has(e.id));doc.setFontSize(9.5);
+  if(!used.length){doc.setFont('helvetica','normal');doc.setTextColor(150);doc.text('Aucun appareil sélectionné',M+1,y+3.5);y+=7}
+  used.forEach(e=>{pageCheck(7);doc.setTextColor(20);doc.setFont('helvetica','bold');doc.text(e.n,M+1,y+3.5);doc.setFont('helvetica','normal');
+    doc.text(`Sn° ${e.s}   cert. n° ${e.c}`+(e.e?`   (valide jusqu'au ${fmtD(e.e)})`:''),M+62,y+3.5);doc.setDrawColor(225);doc.line(M,y+5.5,M+CW,y+5.5);y+=6.5});
+  band('Demande formulée');kv([['Défaut signalé',v('defSig')],['Défaut constaté',v('defCons')]]);
+  t.sections.forEach(([nom,set,items])=>{band(nom);items.forEach(i=>status(i,choices[type+'|'+i]))});
+  band('Relevés de mesures');kv(t.champs.map(([l],i)=>[l.replace(/ \(.*\)/,''),v(`m_${type}_${i}`)]));
+  band('Remarques / divers');doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(20);
+  doc.splitTextToSize(v('rem')||'—',CW-2).forEach(l=>{pageCheck(5);doc.text(l,M+1,y+3.5);y+=4.6});y+=2;
+  band('Conclusion');status('Appareil conforme',choices.conforme);kv([['Prochaine révision',fmtD(v('prochaine'))]]);
+  pageCheck(42);y+=2;const sw=(CW-8)/2;
+  [['SAV '+CFG.societe,pads[0],v('techNom')],['Client',pads[1],v('cliNom')]].forEach(([lab,p,nom],i)=>{const x=M+i*(sw+8);
+    doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(20);doc.text(lab+(nom?' – '+nom:''),x,y+3);
+    doc.setDrawColor(170);doc.rect(x,y+5,sw,28);if(p.used)doc.addImage(p.c.toDataURL('image/jpeg',0.92),'JPEG',x+1,y+6,sw-2,26)});
+  y+=36;
+  /* Annexe : photos, deux par ligne */
+  if(PHOTOS.length){doc.addPage();y=16;band('Photos ('+PHOTOS.length+')');const cw2=(CW-6)/2;
+    for(let i=0;i<PHOTOS.length;i+=2){const row=PHOTOS.slice(i,i+2).map(p=>{const h=Math.min(cw2*p.h/p.w,70),w=h*p.w/p.h;return{p,w,h,cap:doc.splitTextToSize(p.cap?`${i+1+PHOTOS.slice(i,i+2).indexOf(p)}. ${p.cap}`:`Photo ${i+1+PHOTOS.slice(i,i+2).indexOf(p)}`,cw2)}});
+      const rh=Math.max(...row.map(r=>r.h))+Math.max(...row.map(r=>r.cap.length))*4+6;pageCheck(rh);
+      row.forEach((r,j)=>{const x=M+j*(cw2+6)+(cw2-r.w)/2;doc.addImage(r.p.src,'JPEG',x,y,r.w,r.h);doc.setDrawColor(200);doc.rect(x,y,r.w,r.h);
+        doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(60);doc.text(r.cap,M+j*(cw2+6)+cw2/2,y+r.h+4,{align:'center',lineHeightFactor:1.2})});
+      y+=rh}}
+  /* Annexe : documents joints */
+  if(DOCS.length){doc.addPage();y=16;band('Documents joints ('+DOCS.length+')');doc.setFontSize(9.5);
+    DOCS.forEach((d,i)=>{pageCheck(8);doc.setFont('helvetica','bold');doc.setTextColor(20);doc.text(`${i+1}. ${d.name}`,M+7,y+4);
+      doc.setFont('helvetica','normal');doc.setTextColor(110);doc.text(d.img?'image en annexe pleine page':'fichier intégré – voir les pièces jointes du PDF',M+CW,y+4,{align:'right'});
+      if(!d.img)doc.attachFile(d.name,d.bytes,d.mime,M+0.5,y+0.5);doc.setDrawColor(225);doc.line(M,y+6.5,M+CW,y+6.5);y+=8});
+    y+=3;doc.setFontSize(8.5);doc.setTextColor(110);doc.setFont('helvetica','italic');
+    doc.text(doc.splitTextToSize("Les fichiers intégrés s'ouvrent depuis le panneau « Pièces jointes » d'Adobe Acrobat Reader ou en cliquant sur le trombone. Certains lecteurs de navigateur ne les affichent pas.",CW),M,y+3);
+    DOCS.filter(d=>d.img).forEach(d=>{doc.addPage();y=16;band('Document – '+d.name);const maxH=282-y-2;let w=CW,h=w*d.h/d.w;if(h>maxH){h=maxH;w=h*d.w/d.h}
+      doc.addImage(d.src,'JPEG',M+(CW-w)/2,y,w,h);doc.setDrawColor(200);doc.rect(M+(CW-w)/2,y,w,h)})}
+  const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(110);
+    doc.text(doc.splitTextToSize(footerLine(),CW-42)[0],M,290);
+    doc.text(`${riVal()||''}  ·  page ${i}/${pages}`,W-M,290,{align:'right'});
+    if(isProv()){try{doc.saveGraphicsState();doc.setGState(new doc.GState({opacity:0.1}));doc.setFont('helvetica','bold');doc.setFontSize(80);doc.setTextColor(180,91,8);
+      doc.text('PROVISOIRE',W/2+10,175,{angle:45,align:'center'});doc.restoreGraphicsState()}catch(e){}}}
+  return doc;
+}
+function fileName(){const v=id=>($(id).value||'').trim();
+  const parts=[riVal()||'RI',v('modele'),v('sn')?'sn°'+v('sn'):'',v('client')].filter(Boolean).join(' ');
+  return parts.replace(/[\\/:*?"<>|]/g,'-')+'.pdf'}
+
+let downloads=null;
+function dl(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);toast('PDF enregistré : '+name)}
+(async()=>{try{downloads=window.claude?.use?await window.claude.use('downloads'):null}catch(e){downloads=null}})();
+$('btnPdf').onclick=async function(){
+  const b=this;b.disabled=true;b.textContent='Création…';
+  try{const doc=buildPdf(),name=fileName(),blob=doc.output('blob');
+    if(downloads){try{await downloads.save({filename:name,data:blob});toast('PDF enregistré : '+name)}
+      catch(e){toast(e?.code==='declined'?'Enregistrement annulé.':'Impossible d\'enregistrer le PDF ici.')}}
+    else{/* Version installée / hors ligne : partage sur mobile, téléchargement sur PC */
+      const file=new File([blob],name,{type:'application/pdf'});
+      if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:name});toast('PDF prêt : '+name)}catch(e){if(e.name!=='AbortError')dl(blob,name)}}
+      else dl(blob,name)}}
+  catch(e){console.error(e);toast('Erreur pendant la création du PDF.')}
+  finally{b.disabled=false;b.textContent='Générer le PDF'}};
+
+$('date').value=new Date().toISOString().slice(0,10);
+renderType();renderEq();renderMedia();applyCfg();
+
+/* Administration */
+$('admOpen').onclick=()=>{$('admPanel').hidden=false;$('admPanel').scrollIntoView({behavior:'smooth'});$('admCode').focus()};
+function lockAdm(){$('admEdit').hidden=true;$('admLock').hidden=false;$('admCode').value='';$('admPanel').hidden=true;$('cNew1').value=$('cNew2').value=''}
+$('admUnlock').onclick=()=>{const now=Date.now();if(now<admUntil){$('admMsg').textContent=`Trop d'essais. Réessayez dans ${Math.ceil((admUntil-now)/1000)} s.`;return}
+  if(hashCode($('admCode').value.trim())===CFG.hash){admTries=0;$('admMsg').textContent='';$('admLock').hidden=true;$('admEdit').hidden=false;
+    Object.entries(CF).forEach(([id,k])=>$(id).value=CFG[k]||'');$('cLogoPos').value=CFG.logoPos||'gauche';$('cLogoW').value=CFG.logoW||35;$('cLogoWv').textContent=(CFG.logoW||35)+' mm'}
+  else{admTries++;if(admTries>=5){admUntil=now+60000;admTries=0}$('admMsg').textContent='Code incorrect.'}};
+$('admCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('admUnlock').click()});
+function readAdm(){const n1=$('cNew1').value.trim(),n2=$('cNew2').value.trim();
+  if(n1||n2){if(n1.length<6){toast('Le nouveau code doit faire au moins 6 caractères.');return false}if(n1!==n2){toast('Les deux nouveaux codes ne sont pas identiques.');return false}}
+  Object.entries(CF).forEach(([id,k])=>CFG[k]=$(id).value.trim());if(n1)CFG.hash=hashCode(n1);return true}
+$('admSave').onclick=()=>{if(!readAdm())return;try{localStorage.setItem('ssti_cfg',JSON.stringify(CFG))}catch(e){}applyCfg();$('cNew1').value=$('cNew2').value='';toast('En-tête et pied de page enregistrés')};
+$('admClose').onclick=lockAdm;
+/* Logo : converti en JPEG sur fond blanc pour le PDF, taille et position réglables */
+$('cLogo').addEventListener('change',async ev=>{const f=ev.target.files[0];ev.target.value='';if(!f)return;
+  try{const j=await toJpeg(f,800);CFG.logo=j.src;CFG.logoW=CFG.logoW||35;CFG.logoPos=$('cLogoPos').value;applyCfg();toast('Logo ajouté – pensez à enregistrer')}catch(e){toast('Image illisible par ce navigateur.')}});
+$('cLogoDel').onclick=()=>{delete CFG.logo;applyCfg();toast('Logo retiré – pensez à enregistrer')};
+$('cLogoW').addEventListener('input',e=>{CFG.logoW=+e.target.value;$('cLogoWv').textContent=e.target.value+' mm';applyCfg()});
+$('cLogoPos').addEventListener('change',e=>{CFG.logoPos=e.target.value;applyCfg()});
+$('admExport').onclick=async()=>{if(!readAdm())return;try{localStorage.setItem('ssti_cfg',JSON.stringify(CFG))}catch(e){}applyCfg();
+  const cl=document.documentElement.cloneNode(true),q=s=>cl.querySelector(s);
+  q('#cfgData').textContent=JSON.stringify(CFG);
+  ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
+  cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');
+  const html='<!DOCTYPE html>\n'+cl.outerHTML,name='rapport_SSTI_hors_ligne.html';
+  if(downloads){try{await downloads.save({filename:name,data:html});toast('Version techniciens enregistrée')}catch(e){toast('Enregistrement annulé.')}}
+  else dl(new Blob([html],{type:'text/html'}),name)};
+</script>
+<script>
+/* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
+if('serviceWorker' in navigator && location.protocol==='https:'){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body></html>
