@@ -280,6 +280,14 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
         <div class="f"><label for="cTel">Téléphone</label><input id="cTel"></div>
         <div class="f"><label for="cEmail">E-mail</label><input id="cEmail"></div>
       </div>
+      <div class="subh">Référence qualité du document</div>
+      <div class="grid">
+        <div class="f"><label for="cDocRef">Référence du document</label><input id="cDocRef" class="mono" placeholder="ENR-SAV-07"></div>
+        <div class="f"><label for="cDocVer">Version / indice</label><input id="cDocVer" class="mono" placeholder="3"></div>
+        <div class="f"><label for="cDocDate">Date d'application</label><input id="cDocDate" type="date"></div>
+        <div class="f"><label for="cDocPos">Afficher dans</label><select id="cDocPos"><option value="pied">Le pied de page</option><option value="les2">L'en-tête et le pied de page</option></select></div>
+      </div>
+      <div class="empty">Apparaît sur chaque page du PDF, par exemple « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 ». Changez la version ici à chaque révision de la procédure.</div>
       <div class="subh">Changer le code</div>
       <div class="grid">
         <div class="f"><label for="cNew1">Nouveau code (6 caractères minimum)</label><input id="cNew1" type="password" autocomplete="new-password"></div>
@@ -432,9 +440,12 @@ const hashCode=c=>sha256('ssti-rapport:'+c);
 function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=false;L.style.width=(CFG.logoW||35)+'mm';
     L.style.justifySelf={gauche:'start',centre:'center',droite:'end'}[CFG.logoPos||'gauche']}else{L.hidden=true;L.removeAttribute('src')}
   $('hTitre').textContent=CFG.titre;$('hNorme').textContent=CFG.norme;
-  $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`}
+  $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`+(docLine()?`<br><span class="mono">${esc(docLine())}</span>`:'')}
+/* Référence qualité : « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 » */
+function docLine(){const r=(CFG.docRef||'').trim(),v=(CFG.docVer||'').trim(),d=CFG.docDate?fmtD(CFG.docDate):'';
+  const ver=v?('Version '+v.replace(/^v(ersion)?\s*/i,'')+(d?' du '+d:'')):(d?'Applicable le '+d:'');return [r?'Réf. '+r:'',ver].filter(Boolean).join(' – ')}
 function footerLine(){return `${CFG.societe} – ${CFG.adresse} – Tél : ${CFG.tel} – ${CFG.email}`}
-const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email'};
+const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocRef:'docRef',cDocVer:'docVer',cDocDate:'docDate',cDocPos:'docPos'};
 let admTries=0,admUntil=0;
 const SETS={chk:[['Contrôlé','c'],['Remplacé','r'],['N/A','n']],yn:[['Oui','c'],['Non','k']],ok:[['Conforme','c'],['Non conforme','k']]};
 const TYPES={
@@ -650,8 +661,9 @@ function buildPdf(){
   /* Bandeau supérieur, comme la barre de l'application */
   doc.setFillColor(...BAND);doc.rect(0,0,W,15,'F');doc.setDrawColor(...LINE);doc.line(0,15,W,15);doc.setTextColor(...NAVY);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text("Rapport d'intervention",M,6.6);
   doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text('RI n° '+(riVal()||'—'),M,11.4);
-  doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(CFG.societe||'',W-M,6.6,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(fmtD(v('date'))||'',W-M,11.4,{align:'right'});
+  const dl=docLine(),dlTop=dl&&CFG.docPos==='les2';
+  doc.setFont('helvetica','bold');doc.setFontSize(dlTop?8:9);doc.text(dlTop?dl:(CFG.societe||''),W-M,6.6,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text((dlTop&&v('date')?'Intervention du ':'')+(fmtD(v('date'))||''),W-M,11.4,{align:'right'});
   y=22;
   if(CFG.logo){const L=$('hLogo'),nw=L.naturalWidth||1,nh=L.naturalHeight||1;let lw=Math.min(CFG.logoW||35,CW),lh=lw*nh/nw;if(lh>32){lh=32;lw=lh*nw/nh}
     const lx={gauche:M,centre:(W-lw)/2,droite:M+CW-lw}[CFG.logoPos||'gauche'];doc.addImage(CFG.logo,'JPEG',lx,y,lw,lh);y+=lh+5}
@@ -726,6 +738,7 @@ function buildPdf(){
     const sw1=doc.getTextWidth(so);doc.setFont('helvetica','normal');const tw=sw1+doc.getTextWidth(rest),x0=W/2-tw/2;
     doc.setFont('helvetica','bold');doc.text(so,x0,287.2);doc.setFont('helvetica','normal');doc.text(rest,x0+sw1,287.2);
     doc.text(CFG.email||'',W/2,290.8,{align:'center'});
+    if(dl){doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(dl,62)[0],M,290.8);doc.setFont('helvetica','normal')}
     doc.text(`${riVal()||''}  ·  page ${i}/${pages}`,W-M,290.8,{align:'right'});
     if(isProv()){try{doc.saveGraphicsState();doc.setGState(new doc.GState({opacity:0.1}));doc.setFont('helvetica','bold');doc.setFontSize(80);doc.setTextColor(180,91,8);
       doc.text('PROVISOIRE',W/2+10,175,{angle:45,align:'center'});doc.restoreGraphicsState()}catch(e){}}}
