@@ -599,7 +599,8 @@ document.addEventListener('click',ev=>{const a=ev.target.closest('[data-delp],[d
 function buildPdf(){
   const doc=new MiniPDF();
   const W=210,M=12,CW=W-2*M,P=4,IX=M+P,IW=CW-2*P,BOT=279;
-  const NAVY=[29,79,122],SOFT=[227,236,245],LINE=[213,219,227],MUTED=[91,102,117],FG=[27,36,48],NUM=[112,142,172];
+  /* Charte : tons gris clairs */
+  const NAVY=[64,70,79],SOFT=[238,240,243],LINE=[210,214,220],MUTED=[105,112,122],FG=[33,37,43],NUM=[150,156,165],BAND=[232,235,239];
   const COL={c:[44,122,63],r:[31,98,176],n:[107,116,128],k:[179,38,30]};
   let y=14,card=null,secN=0;const nn=()=>String(++secN).padStart(2,'0');
   const v=id=>($(id).value||'').trim();
@@ -647,7 +648,7 @@ function buildPdf(){
 
   const t=TYPES[type];
   /* Bandeau supérieur, comme la barre de l'application */
-  doc.setFillColor(...NAVY);doc.rect(0,0,W,15,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text("Rapport d'intervention",M,6.6);
+  doc.setFillColor(...BAND);doc.rect(0,0,W,15,'F');doc.setDrawColor(...LINE);doc.line(0,15,W,15);doc.setTextColor(...NAVY);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text("Rapport d'intervention",M,6.6);
   doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text('RI n° '+(riVal()||'—'),M,11.4);
   doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(CFG.societe||'',W-M,6.6,{align:'right'});
   doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(fmtD(v('date'))||'',W-M,11.4,{align:'right'});
