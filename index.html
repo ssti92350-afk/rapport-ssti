@@ -138,6 +138,13 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .val-ok{font-weight:600}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
+.int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
+.ichip{font:inherit;font-size:13px;font-weight:500;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;min-height:34px}
+.ichip[aria-pressed="true"].r{background:var(--repl);border-color:var(--repl);color:var(--surface)}
+.ichip[aria-pressed="true"].v{background:var(--warn);border-color:var(--warn);color:var(--surface)}
+.suivi-item{display:grid;gap:4px;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.suivi-item .meta{font-size:12px;color:var(--muted)}
+.suivi-h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.chip,.typecard{transition:background-color .12s,border-color .12s}}
 </style>
@@ -157,6 +164,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div>
 
   <div id="certNotice"></div>
+  <div id="suiviNotice" hidden></div>
 
   <section id="ocrSec" hidden><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
     <div id="ocrOff" class="empty">La lecture des notes manuscrites nécessite une connexion internet et fonctionne dans la version Claude du rapport. Dans cette version, remplissez le rapport à la main.</div>
@@ -196,6 +204,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="f"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
     <div class="f"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
   </div></section>
+
+  <div id="prevNotice" hidden></div>
 
   <section><h2><span class="n">04</span>Équipement de mesure utilisé</h2><div class="body">
     <div id="eqList"></div>
@@ -249,6 +259,24 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
       <div class="sig"><div class="sig-h"><span class="lbl">Signature technicien SAV</span><button class="link" data-clear="0" type="button">Effacer</button></div><canvas id="sig0"></canvas><input id="techNom" placeholder="Nom du technicien"></div>
       <div class="sig"><div class="sig-h"><span class="lbl">Signature client</span><button class="link" data-clear="1" type="button">Effacer</button></div><canvas id="sig1"></canvas><input id="cliNom" placeholder="Nom du signataire client"></div>
     </div>
+  </div></section>
+
+  <section class="int" id="intSec"><h2><span class="n">🔒</span>Partie interne technicien – n'apparaît pas sur le PDF</h2><div class="body">
+    <div class="f"><label for="intObs">Observations particulières</label><textarea id="intObs" rows="3" placeholder="Accès difficile, machine à surveiller, interlocuteur, pièce à commander…"></textarea></div>
+    <div class="subh">À prévoir pour la prochaine maintenance</div>
+    <div id="intParts"></div>
+    <div class="drop"><input id="intNew" list="intSug" placeholder="Pièce ou point (ex. Courroies de transfert)" style="flex:1;min-width:200px;width:auto"><datalist id="intSug"></datalist><button class="btn btn-line" type="button" id="intAdd">Ajouter</button></div>
+    <div class="subh">Rappel du prochain préventif</div>
+    <div class="grid">
+      <div class="f"><label for="intNext">Date du prochain préventif</label><input id="intNext" type="date"><span class="lbl" id="intNextHint"></span></div>
+      <div class="f"><label for="intLead">Me prévenir</label><select id="intLead"><option value="30">1 mois avant</option><option value="60">2 mois avant</option><option value="0">Pas de rappel</option></select></div>
+    </div>
+    <div class="drop"><button class="btn btn-line" type="button" id="intSave">Enregistrer dans le suivi</button><button class="btn btn-line" type="button" id="intIcs">Ajouter au calendrier du téléphone</button></div>
+    <div class="empty">Enregistré sur cet appareil, dans le suivi des préventifs, quand vous validez le rapport (ou avec « Enregistrer dans le suivi »). Jamais imprimé dans le PDF. À l'ouverture du rapport, une alerte apparaît en haut 1 ou 2 mois avant la date du préventif.</div>
+  </div></section>
+
+  <section class="int"><h2><span class="n">⏰</span>Suivi des préventifs – interne <span id="suiviCount"></span></h2><div class="body">
+    <details id="suiviSec" style="border-top:0;padding-top:0"><summary>Voir les machines suivies sur cet appareil</summary><div id="suiviList" class="mgr"></div></details>
   </div></section>
 
   <footer><span id="fTxt"><b>SSTI</b> – 6 rue des Mariniers 94290 VILLENEUVE LE ROI – Tél : 09 73 28 37 52<br>secretariat@ssti-tm.com</span>
@@ -887,11 +915,120 @@ $('cLogoPos').addEventListener('change',e=>{CFG.logoPos=e.target.value;applyCfg(
 $('admExport').onclick=async()=>{if(!readAdm())return;try{localStorage.setItem('ssti_cfg',JSON.stringify(CFG))}catch(e){}applyCfg();
   const cl=document.documentElement.cloneNode(true),q=s=>cl.querySelector(s);
   q('#cfgData').textContent=JSON.stringify(CFG);
-  ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
+  ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel','#suiviNotice','#prevNotice','#intParts','#suiviList','#intSug'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
   cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');q('#valModal').setAttribute('hidden','');q('#ocrSec').setAttribute('hidden','');q('#ocrOn').setAttribute('hidden','');q('#ocrOff').removeAttribute('hidden');q('#ocrThumbs').innerHTML='';q('#ocrMsg').textContent='';
   const html='<!DOCTYPE html>\n'+cl.outerHTML,name='rapport_SSTI_hors_ligne.html';
   if(downloads){try{await downloads.save({filename:name,data:html});toast('Version techniciens enregistrée')}catch(e){toast('Enregistrement annulé.')}}
   else dl(new Blob([html],{type:'text/html'}),name)};
+</script>
+<script>
+/* Partie interne technicien : jamais imprimée dans le PDF.
+   Observations, pièces à prévoir et rappel du prochain préventif, enregistrés sur l'appareil (suivi par machine). */
+const SK='ssti_suivi';
+let SUIVI=(()=>{try{const v=JSON.parse(localStorage.getItem(SK));if(v&&typeof v==='object'&&!Array.isArray(v))return v}catch(e){}return {}})();
+function saveS(){try{localStorage.setItem(SK,JSON.stringify(SUIVI))}catch(e){}}
+let IPARTS=[],nextManual=false;
+const ACTS=[['À remplacer','r'],['À vérifier','v']];
+const nzs=s=>String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
+function mKey(){const sn=nzs($('sn').value),mo=nzs($('modele').value),cl=nzs($('client').value);if(!sn&&!mo)return'';return (sn||mo)+'|'+cl}
+function isoD(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function today0(){const t=new Date();t.setHours(0,0,0,0);return t}
+
+/* Date du prochain préventif : « prochaine révision préconisée » si renseignée, sinon date anniversaire de l'intervention */
+function autoNext(){if(nextManual)return;const p=$('prochaine').value;let iso='';
+  if(p)iso=p+'-01';else if($('date').value){const d=new Date($('date').value+'T00:00:00');d.setFullYear(d.getFullYear()+1);iso=isoD(d)}
+  $('intNext').value=iso;$('intNextHint').textContent=iso?(p?'D\'après « Prochaine révision préconisée »':'Date anniversaire de l\'intervention'):''}
+$('intNext').addEventListener('input',()=>{nextManual=!!$('intNext').value;if(nextManual)$('intNextHint').textContent='Date saisie à la main';else autoNext()});
+['prochaine','date'].forEach(id=>{$(id).addEventListener('change',autoNext);$(id).addEventListener('input',autoNext)});
+
+/* Pièces / points à prévoir */
+function sugg(){$('intSug').innerHTML=TYPES[type].sections.flatMap(s=>s[2]).map(i=>`<option value="${esc(i.replace('+ SEALCHECK','').trim())}">`).join('')}
+function renderParts(){$('intParts').innerHTML=IPARTS.length?IPARTS.map((x,i)=>`<div class="row"><span class="t">${esc(x.p)}</span><div class="chips">`+
+    ACTS.map(([t,c])=>`<button type="button" class="ichip ${c}" data-ip="${i}" data-a="${t}" aria-pressed="${x.a===t}">${t}</button>`).join('')+
+    `<button type="button" class="link" data-iprm="${i}">Retirer</button></div></div>`).join(''):'<div class="empty">Aucune pièce ni point prévu pour l\'instant.</div>'}
+function addPart(p,a){p=String(p||'').trim();if(!p)return;const ex=IPARTS.find(x=>x.p.toLowerCase()===p.toLowerCase());if(ex){if(a)ex.a=a}else IPARTS.push({p,a:a||'À remplacer'});renderParts()}
+$('intAdd').onclick=()=>{addPart($('intNew').value);$('intNew').value='';$('intNew').focus()};
+$('intNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('intAdd').click()}});
+$('intParts').addEventListener('click',ev=>{const c=ev.target.closest('[data-ip]');if(c){IPARTS[+c.dataset.ip].a=c.dataset.a;renderParts();return}
+  const r=ev.target.closest('[data-iprm]');if(r){IPARTS.splice(+r.dataset.iprm,1);renderParts()}});
+
+/* Ce qui avait été prévu lors de la dernière visite sur cette machine */
+function partsTxt(parts){return ACTS.map(([t])=>{const l=(parts||[]).filter(x=>x.a===t).map(x=>x.p);return l.length?`${t} : ${l.join(', ')}`:''}).filter(Boolean)}
+function renderPrev(){const r=SUIVI[mKey()],el=$('prevNotice');
+  if(!r||(r.ri===riVal()&&r.date===$('date').value)){el.innerHTML='';el.hidden=true;return}
+  const pt=partsTxt(r.parts);
+  el.innerHTML=`<div class="notice warn"><b>Interne – prévu lors de l'intervention du ${esc(fmtD(r.date))}${r.ri?' (RI '+esc(r.ri)+')':''}</b>`+
+    (pt.length?pt.map(l=>`<span>${esc(l)}</span>`).join(''):'<span>Aucune pièce prévue.</span>')+(r.obs?`<span>Observations : ${esc(r.obs)}</span>`:'')+
+    (r.parts&&r.parts.length?`<div><button type="button" class="link" id="prevTake">Reporter ces points au prochain préventif</button></div>`:'')+'</div>';el.hidden=false}
+document.addEventListener('click',ev=>{if(!ev.target.closest('#prevTake'))return;const r=SUIVI[mKey()];(r&&r.parts||[]).forEach(x=>addPart(x.p,x.a));
+  $('intSec').scrollIntoView({behavior:'smooth',block:'start'});toast('Points reportés dans la partie interne')});
+['sn','client','modele'].forEach(id=>$(id).addEventListener('input',renderPrev));
+
+/* Suivi des préventifs (horloge de rappel) */
+function due(r){if(!r.next)return{k:'na',j:null,txt:'Date du prochain préventif non renseignée'};
+  const j=Math.round((new Date(r.next+'T00:00:00')-today0())/864e5),lead=+r.lead||0;
+  if(j<0)return{k:'bad',j,txt:`Préventif dépassé de ${-j} j (prévu le ${fmtD(r.next)})`};
+  if(lead&&j<=lead)return{k:'warn',j,txt:`Préventif le ${fmtD(r.next)} – dans ${j} j`};
+  return{k:'ok',j,txt:`Préventif le ${fmtD(r.next)}`}}
+function recName(r){return [r.client||'Client ?',[r.modele,r.sn?'sn° '+r.sn:''].filter(Boolean).join(' ')].filter(Boolean).join(' – ')}
+function renderSuivi(){const ks=Object.keys(SUIVI).sort((a,b)=>(SUIVI[a].next||'9999').localeCompare(SUIVI[b].next||'9999'));
+  $('suiviCount').textContent=ks.length?`(${ks.length})`:'';
+  $('suiviList').innerHTML=ks.length?ks.map(k=>{const r=SUIVI[k],d=due(r),pt=partsTxt(r.parts);
+    return `<div class="suivi-item"><div class="suivi-h"><b>${esc(recName(r))}</b><span class="pill ${d.k}">${esc(d.txt)}</span></div>
+      <span class="meta mono">${esc(r.type&&TYPES[r.type]?TYPES[r.type].nom:'')} · dernière intervention ${esc(fmtD(r.date)||'?')}${r.ri?' · RI '+esc(r.ri):''} · rappel ${+r.lead?(+r.lead===60?'2 mois':'1 mois')+' avant':'désactivé'}</span>`+
+      pt.map(l=>`<span>${esc(l)}</span>`).join('')+(r.obs?`<span class="lbl">Observations : ${esc(r.obs)}</span>`:'')+
+      `<div class="drop"><button type="button" class="btn btn-line" data-sprep="${esc(k)}">Préparer le rapport</button><button type="button" class="btn btn-line" data-sics="${esc(k)}">Ajouter au calendrier</button><button type="button" class="btn btn-line" data-sdel="${esc(k)}">Supprimer</button></div></div>`}).join('')
+    :'<div class="empty">Aucune machine suivie sur cet appareil. Chaque rapport validé y est ajouté avec la date de son prochain préventif.</div>';
+  const alert=ks.map(k=>({r:SUIVI[k],d:due(SUIVI[k])})).filter(x=>x.d.k==='bad'||x.d.k==='warn');
+  $('suiviNotice').innerHTML=alert.length?`<div class="notice warn"><b>Préventifs à planifier</b>${alert.map(x=>`<span>${esc(recName(x.r))} : ${esc(x.d.txt)}${x.r.parts&&x.r.parts.length?` · ${x.r.parts.length} pièce(s)/point(s) prévu(s)`:''}</span>`).join('')}<div><button type="button" class="link" id="suiviGo">Voir le suivi des préventifs</button></div></div>`:'';
+  $('suiviNotice').hidden=!alert.length}
+document.addEventListener('click',ev=>{if(ev.target.closest('#suiviGo')){$('suiviSec').open=true;$('suiviSec').scrollIntoView({behavior:'smooth',block:'start'})}});
+$('suiviList').addEventListener('click',ev=>{const b=ev.target.closest('[data-sprep],[data-sics],[data-sdel]');if(!b)return;
+  if(b.dataset.sics){icsFor(SUIVI[b.dataset.sics]);return}
+  if(b.dataset.sdel){if(!b.dataset.armed){b.dataset.armed=1;b.textContent='Confirmer la suppression';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Supprimer'}},4000);return}
+    delete SUIVI[b.dataset.sdel];saveS();renderSuivi();renderPrev();toast('Machine retirée du suivi');return}
+  const r=SUIVI[b.dataset.sprep];if(!r)return;
+  if(r.type&&TYPES[r.type]&&r.type!==type){type=r.type;renderType();sugg()}
+  Object.entries({client:r.client,contact:r.contact,adresse:r.adresse,cpville:r.cpville,fab:r.fab,modele:r.modele,sn:r.sn,soft:r.soft,dfab:r.dfab}).forEach(([id,v])=>{if(v!=null&&v!=='')$(id).value=v});
+  $('defSig').value='PRÉVENTIF';renderPrev();window.scrollTo({top:0,behavior:'smooth'});toast('Client et machine repris – vérifiez le compteur et la date')});
+
+function curRec(){return{client:$('client').value.trim(),contact:$('contact').value.trim(),adresse:$('adresse').value.trim(),cpville:$('cpville').value.trim(),
+  fab:$('fab').value.trim(),modele:$('modele').value.trim(),sn:$('sn').value.trim(),soft:$('soft').value.trim(),dfab:$('dfab').value.trim(),
+  type,ri:riVal(),date:$('date').value,next:$('intNext').value,lead:+$('intLead').value,obs:$('intObs').value.trim(),parts:IPARTS.map(x=>({...x})),maj:new Date().toISOString()}}
+function saveSuivi(silent){autoNext();const k=mKey();
+  if(!k){if(!silent)toast('Renseignez au moins le modèle ou le n° de série pour enregistrer le suivi.');return false}
+  SUIVI[k]=curRec();saveS();renderSuivi();if(!silent)toast('Enregistré dans le suivi des préventifs');return true}
+$('intSave').onclick=()=>saveSuivi(false);
+$('intIcs').onclick=()=>{saveSuivi(true);icsFor(curRec())};
+
+/* Rappel dans le calendrier du téléphone (fichier .ics avec alarme 1 ou 2 mois avant) */
+async function icsFor(r){if(!r||!r.next){toast('Indiquez la date du prochain préventif.');return}
+  const x=s=>String(s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const fold=l=>{const o=[];while(l.length>72){o.push(l.slice(0,72));l=' '+l.slice(72)}o.push(l);return o.join('\r\n')};
+  const e=new Date(r.next+'T00:00:00');e.setDate(e.getDate()+1);
+  const desc=[`Dernière intervention : ${fmtD(r.date)}${r.ri?' (RI '+r.ri+')':''}`,...partsTxt(r.parts),r.obs?'Observations : '+r.obs:''].filter(Boolean).join('\n');
+  const lead=+r.lead||0,stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SSTI//Rapport intervention//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
+    `UID:ssti-${sha256(nzs(r.sn||r.modele)+'|'+nzs(r.client)).slice(0,20)}@rapport-ssti`,`DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${r.next.replace(/-/g,'')}`,`DTEND;VALUE=DATE:${isoD(e).replace(/-/g,'')}`,
+    `SUMMARY:${x('Préventif '+recName(r))}`,`DESCRIPTION:${x(desc)}`];
+  if(lead)L.push('BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${x('Préventif à planifier dans '+(lead===60?'2 mois':'1 mois')+' : '+recName(r))}`,`TRIGGER:-P${lead}D`,'END:VALARM');
+  L.push('END:VEVENT','END:VCALENDAR');
+  const txt=L.map(fold).join('\r\n')+'\r\n',name=('Préventif '+[r.modele,r.sn,r.client].filter(Boolean).join(' ')).replace(/[\\/:*?"<>|]/g,'-')+'.ics';
+  const blob=new Blob([txt],{type:'text/calendar'});
+  try{if(downloads){await downloads.save({filename:name,data:blob});toast('Rappel enregistré : ouvrez-le pour l\'ajouter au calendrier');return}
+    const file=new File([blob],name,{type:'text/calendar'});
+    if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
+    dl(blob,name);toast('Rappel téléchargé : ouvrez-le pour l\'ajouter au calendrier')}catch(e){toast('Impossible de créer le rappel ici.')}}
+
+/* Branchements : validation, nouveau rapport, changement de type */
+{const vg=$('valGo').onclick;$('valGo').onclick=async function(){saveSuivi(true);return vg.call(this)}}
+{const bp=$('btnPdf').onclick;$('btnPdf').onclick=function(){autoNext();renderPrev();bp.call(this);
+  const n=IPARTS.length,k=mKey();$('valBody').insertAdjacentHTML('beforeend',`<div class="empty">Partie interne (non imprimée) : ${n} pièce(s)/point(s) prévu(s)${$('intNext').value?', prochain préventif le '+esc(fmtD($('intNext').value)):''}. ${k?'Enregistrée dans le suivi des préventifs à la validation.':'Renseignez le modèle ou le n° de série pour l\'enregistrer dans le suivi.'}</div>`)}}
+{const rs=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;rs.call(this);
+  if(armed){IPARTS=[];$('intObs').value='';$('intNew').value='';nextManual=false;$('intLead').value='30';autoNext();renderParts();renderPrev()}}}
+$('typeSel').addEventListener('click',()=>setTimeout(sugg));
+autoNext();renderParts();sugg();renderSuivi();renderPrev();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
