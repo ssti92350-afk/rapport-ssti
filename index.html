@@ -158,7 +158,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 
   <div id="certNotice"></div>
 
-  <section id="ocrSec"><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
+  <section id="ocrSec" hidden><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
     <div id="ocrOff" class="empty">La lecture des notes manuscrites nécessite une connexion internet et fonctionne dans la version Claude du rapport. Dans cette version, remplissez le rapport à la main.</div>
     <div id="ocrOn" hidden style="display:grid;gap:10px">
       <div class="empty">Photographiez vos notes (une ou plusieurs pages). Claude les lit et pré-remplit le rapport. Les champs remplis automatiquement sont surlignés en orange : vérifiez-les avant de valider.</div>
@@ -261,6 +261,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
       <div id="admMsg" class="lbl" style="grid-column:1/-1"></div>
     </div>
     <div id="admEdit" hidden style="display:grid;gap:10px">
+      <div class="notice ok"><span>La lecture des notes manuscrites est affichée en haut du rapport tant que ce panneau est déverrouillé. Elle redevient invisible quand vous verrouillez.</span></div>
       <div class="subh">En-tête</div>
       <div class="grid">
         <div class="f" style="grid-column:1/-1"><label for="cTitre">Titre du rapport</label><input id="cTitre"></div>
@@ -795,9 +796,9 @@ renderType();renderEq();renderMedia();applyCfg();
 
 /* Administration */
 $('admOpen').onclick=()=>{$('admPanel').hidden=false;$('admPanel').scrollIntoView({behavior:'smooth'});$('admCode').focus()};
-function lockAdm(){$('admEdit').hidden=true;$('admLock').hidden=false;$('admCode').value='';$('admPanel').hidden=true;$('cNew1').value=$('cNew2').value=''}
+function lockAdm(){$('ocrSec').hidden=true;$('admEdit').hidden=true;$('admLock').hidden=false;$('admCode').value='';$('admPanel').hidden=true;$('cNew1').value=$('cNew2').value=''}
 $('admUnlock').onclick=()=>{const now=Date.now();if(now<admUntil){$('admMsg').textContent=`Trop d'essais. Réessayez dans ${Math.ceil((admUntil-now)/1000)} s.`;return}
-  if(hashCode($('admCode').value.trim())===CFG.hash){admTries=0;$('admMsg').textContent='';$('admLock').hidden=true;$('admEdit').hidden=false;
+  if(hashCode($('admCode').value.trim())===CFG.hash){admTries=0;$('admMsg').textContent='';$('admLock').hidden=true;$('admEdit').hidden=false;$('ocrSec').hidden=false;
     Object.entries(CF).forEach(([id,k])=>$(id).value=CFG[k]||'');$('cLogoPos').value=CFG.logoPos||'gauche';$('cLogoW').value=CFG.logoW||35;$('cLogoWv').textContent=(CFG.logoW||35)+' mm'}
   else{admTries++;if(admTries>=5){admUntil=now+60000;admTries=0}$('admMsg').textContent='Code incorrect.'}};
 $('admCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('admUnlock').click()});
@@ -816,7 +817,7 @@ $('admExport').onclick=async()=>{if(!readAdm())return;try{localStorage.setItem('
   const cl=document.documentElement.cloneNode(true),q=s=>cl.querySelector(s);
   q('#cfgData').textContent=JSON.stringify(CFG);
   ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
-  cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');q('#valModal').setAttribute('hidden','');q('#ocrOn').setAttribute('hidden','');q('#ocrOff').removeAttribute('hidden');q('#ocrThumbs').innerHTML='';q('#ocrMsg').textContent='';
+  cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');q('#valModal').setAttribute('hidden','');q('#ocrSec').setAttribute('hidden','');q('#ocrOn').setAttribute('hidden','');q('#ocrOff').removeAttribute('hidden');q('#ocrThumbs').innerHTML='';q('#ocrMsg').textContent='';
   const html='<!DOCTYPE html>\n'+cl.outerHTML,name='rapport_SSTI_hors_ligne.html';
   if(downloads){try{await downloads.save({filename:name,data:html});toast('Version techniciens enregistrée')}catch(e){toast('Enregistrement annulé.')}}
   else dl(new Blob([html],{type:'text/html'}),name)};
