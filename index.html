@@ -136,6 +136,8 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .val-body{display:grid;gap:8px;font-size:14px}
 .val-body ul{margin:4px 0 0;padding-left:18px}
 .val-ok{font-weight:600}
+.allok{margin-left:auto;display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.allok input{width:18px;height:18px;margin:0;accent-color:var(--accent);cursor:pointer}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -546,7 +548,19 @@ $('btnAddEq').onclick=()=>{const n=$('nNom').value.trim();if(!n){$('addMsg').tex
 /* Choix type QCM */
 function chipsHTML(key,set){return SETS[set].map(([t,c])=>`<button type="button" class="chip ${c}" data-k="${esc(key)}" data-v="${t}" aria-pressed="${choices[key]===t}">${t}</button>`).join('')}
 document.addEventListener('click',ev=>{const b=ev.target.closest('.chip');if(!b)return;const k=b.dataset.k,v=b.dataset.v;
-  choices[k]=choices[k]===v?undefined:v;b.parentNode.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[k]===x.dataset.v))});
+  choices[k]=choices[k]===v?undefined:v;b.parentNode.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[k]===x.dataset.v));syncAllOk()});
+
+/* « Tout valider » par rubrique : pièces → Remplacé, inspections/nettoyages/contrôles → Contrôlé, Oui/Non → Oui */
+function allOkValue(item,set){if(set==='yn')return'Oui';if(set==='ok')return'Conforme';
+  return /^(inspection|nettoyage|mise en route|contr[ôo]le|v[ée]rification|[ée]talonnage|synchronisation|calibration)/i.test(item.trim())?'Contrôlé':'Remplacé'}
+function syncAllOk(){const t=TYPES[type];document.querySelectorAll('[data-allok]').forEach(cb=>{const s=t.sections[+cb.dataset.allok];if(!s)return;
+  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))})}
+document.addEventListener('change',ev=>{const cb=ev.target.closest('[data-allok]');if(!cb)return;
+  const si=+cb.dataset.allok,[, set,items]=TYPES[type].sections[si],sec=document.querySelector(`#dyn section[data-si="${si}"]`);
+  items.forEach(i=>{const k=type+'|'+i,v=allOkValue(i,set);
+    if(cb.checked){choices[k]=v;if(typeof AUTO!=='undefined')AUTO.delete('k:'+k)}else if(choices[k]===v)choices[k]=undefined});
+  if(sec){sec.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[x.dataset.k]===x.dataset.v));sec.querySelectorAll('.row.auto').forEach(r=>r.classList.remove('auto'))}
+  syncAllOk();toast(cb.checked?'Rubrique remplie – chaque ligne reste modifiable':'Rubrique vidée')});
 
 /* SEALCHECK : peut être barré quand l'emballage ne permet pas le test */
 function labelHTML(i){if(!i.includes('SEALCHECK'))return esc(i);const off=!!choices.sealNA;
@@ -557,10 +571,10 @@ function renderType(){
   $('typeSel').innerHTML=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typecard" data-type="${k}" aria-pressed="${k===type}"><b>${t.nom}</b><span>${t.ex}</span></button>`).join('');
   const t=TYPES[type];$('headType').textContent=t.titre;
   let n=6,h='';
-  t.sections.forEach(([nom,set,items])=>{h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}</h2><div class="body" style="gap:0">`+
+  t.sections.forEach(([nom,set,items],si)=>{h+=`<section data-si="${si}"><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}<label class="allok" title="Remplit toutes les lignes de la rubrique"><input type="checkbox" id="allok_${type}_${si}" data-allok="${si}"> Tout valider</label></h2><div class="body" style="gap:0">`+
     items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
   h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body" id="mesBody">${mesHTML()}</div></section>`;
-  $('dyn').innerHTML=h;setTimeout(markAuto);if(typeof CFG!=='undefined')applyCfg();['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
+  $('dyn').innerHTML=h;syncAllOk();setTimeout(markAuto);if(typeof CFG!=='undefined')applyCfg();['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
 }
 /* Relevés de mesures : un bloc par type d'emballage */
 let MES={};
