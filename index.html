@@ -142,6 +142,8 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .sec-clear{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;white-space:nowrap;align-self:center}
 .allok+.sec-clear{margin-left:4px}
 .sec-clear[data-armed]{color:var(--bad)}
+.oth .t{display:grid;gap:4px}.oth input{font-size:14px;padding:6px 9px}
+.oth-add{padding-top:8px}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -558,11 +560,29 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('.chip');if(!b)
 function allOkValue(item,set){if(set==='yn')return'Oui';if(set==='ok')return'Conforme';
   return /^(inspection|nettoyage|mise en route|contr[ôo]le|v[ée]rification|[ée]talonnage|synchronisation|calibration)/i.test(item.trim())?'Contrôlé':'Remplacé'}
 function syncAllOk(){const t=TYPES[type];document.querySelectorAll('[data-allok]').forEach(cb=>{const s=t.sections[+cb.dataset.allok];if(!s)return;
-  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))})}
+  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))&&othLines(+cb.dataset.allok).every(o=>choices[o.k]==='Remplacé')})}
+/* « Autre » pièce dans les rubriques pièces (Contrôlé / Remplacé / N/A) */
+let OTHERS={};Object.keys(TYPES).forEach(t=>OTHERS[t]={});
+const othKey=(si,id)=>`${type}|autre|${si}|${id}`;
+function othList(si){return (OTHERS[type][si]=OTHERS[type][si]||[])}
+function othLines(si){return othList(si).filter(o=>o.name.trim()).map(o=>({k:othKey(si,o.id),name:o.name.trim()}))}
+function othHTML(si){return othList(si).map(o=>`<div class="row oth"><span class="t"><label class="lbl" for="oth_${type}_${si}_${o.id}">Autre pièce – préciser</label><input id="oth_${type}_${si}_${o.id}" data-oth="${si}|${o.id}" value="${esc(o.name)}" placeholder="Ex. capteur de pression, connecteur…"></span>
+    <div class="chips">${chipsHTML(othKey(si,o.id),'chk')}<button type="button" class="link" data-othrm="${si}|${o.id}">Retirer</button></div></div>`).join('')+
+  `<div class="oth-add"><button type="button" class="btn btn-line" data-othadd="${si}">+ Autre pièce</button></div>`}
+function renderOthers(only){const t=TYPES[type];t.sections.forEach(([,set],si)=>{if(set!=='chk'||(only!=null&&only!==si))return;
+  const body=document.querySelector(`#dyn section[data-si="${si}"]>.body`);if(!body)return;
+  let box=body.querySelector('.oth-box');if(!box){box=document.createElement('div');box.className='oth-box';body.appendChild(box)}box.innerHTML=othHTML(si)});syncAllOk()}
+document.addEventListener('input',ev=>{const d=ev.target.dataset&&ev.target.dataset.oth;if(!d)return;const[si,id]=d.split('|'),o=othList(+si).find(x=>x.id===id);if(o){o.name=ev.target.value;syncAllOk()}});
+document.addEventListener('click',ev=>{const a=ev.target.closest('[data-othadd]');if(a){const si=+a.dataset.othadd,o={id:Date.now().toString(36),name:''};othList(si).push(o);renderOthers(si);
+    const f=$(`oth_${type}_${si}_${o.id}`);f&&f.focus();return}
+  const r=ev.target.closest('[data-othrm]');if(!r)return;
+  if(!r.dataset.armed){r.dataset.armed=1;r.textContent='Confirmer';setTimeout(()=>{if(r.isConnected){delete r.dataset.armed;r.textContent='Retirer'}},4000);return}
+  const[si,id]=r.dataset.othrm.split('|');delete choices[othKey(si,id)];OTHERS[type][si]=othList(+si).filter(x=>x.id!==id);renderOthers(+si)});
 document.addEventListener('change',ev=>{const cb=ev.target.closest('[data-allok]');if(!cb)return;
   const si=+cb.dataset.allok,[, set,items]=TYPES[type].sections[si],sec=document.querySelector(`#dyn section[data-si="${si}"]`);
   items.forEach(i=>{const k=type+'|'+i,v=allOkValue(i,set);
     if(cb.checked){choices[k]=v;if(typeof AUTO!=='undefined')AUTO.delete('k:'+k)}else if(choices[k]===v)choices[k]=undefined});
+  othLines(si).forEach(o=>{if(cb.checked)choices[o.k]='Remplacé';else if(choices[o.k]==='Remplacé')choices[o.k]=undefined});
   if(sec){sec.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[x.dataset.k]===x.dataset.v));sec.querySelectorAll('.row.auto').forEach(r=>r.classList.remove('auto'))}
   syncAllOk();toast(cb.checked?'Rubrique remplie – chaque ligne reste modifiable':'Rubrique vidée')});
 
@@ -578,7 +598,7 @@ function renderType(){
   t.sections.forEach(([nom,set,items],si)=>{h+=`<section data-si="${si}"><h2><span class="n">${String(n++).padStart(2,'0')}</span>${esc(nom)}<label class="allok" title="Remplit toutes les lignes de la rubrique"><input type="checkbox" id="allok_${type}_${si}" data-allok="${si}"> Tout valider</label></h2><div class="body" style="gap:0">`+
     items.map(i=>{const key=type+'|'+i;return `<div class="row"><span class="t">${labelHTML(i)}</span><div class="chips">${chipsHTML(key,set)}</div></div>`}).join('')+'</div></section>'});
   h+=`<section><h2><span class="n">${String(n++).padStart(2,'0')}</span>Relevés de mesures</h2><div class="body" id="mesBody">${mesHTML()}</div></section>`;
-  $('dyn').innerHTML=h;syncAllOk();setTimeout(markAuto);if(typeof CFG!=='undefined')applyCfg();['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
+  $('dyn').innerHTML=h;renderOthers();setTimeout(markAuto);if(typeof CFG!=='undefined')applyCfg();['nPho','nDoc','nRem'].forEach(id=>$(id).textContent=String(n++).padStart(2,'0'));$('nConc').textContent=String(n).padStart(2,'0');
 }
 /* Relevés de mesures : un bloc par type d'emballage */
 let MES={};
@@ -741,7 +761,8 @@ function buildPdf(){
     if(e.e){const s=status(e);pill(s.txt,s.k,IX+IW,y+3)}y+=11});
   close();
   open(nn(),'Demande formulée');fields([['Défaut signalé',v('defSig')],['Défaut constaté',v('defCons')]],2);close();
-  t.sections.forEach(([nom,set,items])=>{open(nn(),nom);items.forEach((i,k)=>qcm(i,set,choices[type+'|'+i],k===0));close()});
+  t.sections.forEach(([nom,set,items],si)=>{open(nn(),nom);items.forEach((i,k)=>qcm(i,set,choices[type+'|'+i],k===0));
+    if(set==='chk')othList(si).forEach(o=>{const v=choices[othKey(si,o.id)];if(o.name.trim()||v)qcm('Autre : '+(o.name.trim()||'(non précisée)'),set,v,false)});close()});
   /* Relevés : unité après la valeur, tolérance dans le libellé, un encadré par emballage */
   const S=MES[type],lab=l=>l.replace(/ \(([^)]*)\)/,(m,g)=>{const tol=g.split(',').map(s=>s.trim()).filter(s=>s.includes('±'));return tol.length?` (${tol.join(', ')})`:''});
   const withU=(val,u)=>{val=(val||'').trim();return val?(u&&!val.toLowerCase().endsWith(u.toLowerCase())?`${val} ${u}`:val):''};
@@ -813,7 +834,8 @@ function valReport(){const t=TYPES[type],S=MES[type],miss=[],warn=[];
   if(!isProv()&&!$('ri').value.trim())miss.push('N° de rapport (ou cochez « rapport provisoire »)');
   [['client','Client'],['modele','Modèle'],['sn','N° de série'],['date',"Date d'intervention"]].forEach(([id,l])=>{if(!$(id).value.trim())miss.push(l)});
   if(!choices.conforme)miss.push('Conformité de l\'appareil');
-  const nr=[];t.sections.forEach(([,,items])=>items.forEach(i=>{if(!choices[type+'|'+i])nr.push(i)}));
+  const nr=[];t.sections.forEach(([,set,items],si)=>{items.forEach(i=>{if(!choices[type+'|'+i])nr.push(i)});
+    if(set==='chk')othList(si).forEach(o=>{const v=choices[othKey(si,o.id)];if(!o.name.trim()&&v)warn.push('Une « autre pièce » n\'est pas précisée');else if(o.name.trim()&&!v)nr.push('Autre : '+o.name.trim())})});
   if(nr.length)warn.push(`${nr.length} point(s) de contrôle non renseigné(s) : ${nr.slice(0,6).join(', ')}${nr.length>6?'…':''}`);
   if(!sel.size)warn.push('Aucun appareil de mesure sélectionné');
   const exp=EQ.filter(e=>sel.has(e.id)&&status(e).k==='bad');if(exp.length)warn.push('Appareil utilisé avec certificat expiré : '+exp.map(e=>e.n).join(', '));
@@ -1056,10 +1078,10 @@ function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,
 async function idbDo(mode,fn){const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction('d',mode),st=tx.objectStore('d'),rq=fn(st);
   tx.oncomplete=()=>{db.close();ok(rq&&rq.result)};tx.onerror=tx.onabort=()=>{db.close();ko(tx.error)}})}
 function draftFields(){return [...document.querySelectorAll('main input[id],main select[id],main textarea[id]')].filter(e=>e.type!=='file'&&
-  !e.closest('#admPanel,#eqDetails,#ocrSec')&&!/^(m_|mc_|cap_|allok_|ech_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
+  !e.closest('#admPanel,#eqDetails,#ocrSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
 function draftData(){const f={};draftFields().forEach(e=>f[e.id]=e.type==='checkbox'?e.checked:e.value);
   return{v:1,savedAt:Date.now(),type,choices,sel:[...sel],MES,PHOTOS,DOCS,IPARTS,nextManual,riSaved,auto:[...AUTO],doutes:OCR_DOUTES,
-    sigs:pads.map(p=>p.used?p.c.toDataURL('image/png'):null),f}}
+    sigs:pads.map(p=>p.used?p.c.toDataURL('image/png'):null),OTHERS,f}}
 function hhmm(t){const d=new Date(t);return `${String(d.getHours()).padStart(2,'0')}h${String(d.getMinutes()).padStart(2,'0')}`}
 async function saveDraft(){if(!draftReady)return;clearTimeout(draftTimer);draftTimer=null;const d=draftData();
   try{await idbDo('readwrite',st=>st.put(d,DRAFT_KEY));$('draftSt').textContent='Enregistré sur l\'appareil à '+hhmm(d.savedAt)}
@@ -1078,6 +1100,7 @@ addEventListener('pagehide',saveDraft);
 function applyDraft(d){
   if(d.type&&TYPES[d.type])type=d.type;choices=d.choices||{};sel=new Set(d.sel||[]);
   if(d.MES)Object.keys(TYPES).forEach(t=>{if(d.MES[t]&&Array.isArray(d.MES[t].emb)&&d.MES[t].emb.length)MES[t]=d.MES[t]});
+  if(d.OTHERS)Object.keys(TYPES).forEach(t=>{if(d.OTHERS[t])OTHERS[t]=d.OTHERS[t]});
   PHOTOS=d.PHOTOS||[];DOCS=d.DOCS||[];IPARTS=d.IPARTS||[];nextManual=!!d.nextManual;riSaved=d.riSaved||'';
   AUTO=new Set(d.auto||[]);OCR_DOUTES=d.doutes||[];
   Object.entries(d.f||{}).forEach(([id,v])=>{const e=$(id);if(!e)return;if(e.type==='checkbox')e.checked=!!v;else e.value=v});
@@ -1091,7 +1114,8 @@ function draftHasContent(d){if(!d||!d.f)return false;const f=d.f;
     toast(`Rapport en cours retrouvé (enregistré le ${dt.toLocaleDateString('fr-FR')} à ${hhmm(d.savedAt)})`);$('draftSt').textContent='Enregistré sur l\'appareil à '+hhmm(d.savedAt)}
     catch(e){console.error(e)}}
   draftReady=true})();
-/* « Nouveau rapport » efface aussi le rapport enregistré */
+/* « Nouveau rapport » efface aussi les autres pièces et le rapport enregistré */
+{const r3=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;if(armed){Object.keys(TYPES).forEach(t=>OTHERS[t]={})}r3.call(this)}}
 {const r2=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r2.call(this);if(armed){draftReady=false;clearDraft().then(()=>{draftReady=true})}}}
 
 /* ===== Bouton « Effacer » par rubrique ===== */
@@ -1104,6 +1128,7 @@ function resetField(e){if(e.type==='checkbox'){e.checked=e.defaultChecked;return
   e.value=e.id==='date'?new Date().toISOString().slice(0,10):e.defaultValue}
 function clearSection(s){const si=s.dataset.si;
   if(si!=null){TYPES[type].sections[+si][2].forEach(i=>{const k=type+'|'+i;delete choices[k];AUTO.delete('k:'+k)});
+    othList(+si).forEach(o=>delete choices[othKey(si,o.id)]);OTHERS[type][si]=[];renderOthers(+si);
     s.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','false'));syncAllOk()}
   if(s.querySelector('#mesBody')){MES[type]={emb:[newEmb(type)],com:TYPES[type].champs.map(([,dv,,com])=>com?dv:null)};
     [...AUTO].filter(k=>/^mc?_/.test(k)).forEach(k=>AUTO.delete(k));$('mesBody').innerHTML=mesHTML()}
