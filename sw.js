@@ -1,5 +1,5 @@
 /* Service worker : rapport SSTI disponible sans connexion */
-const CACHE='rapport-ssti-v23';
+const CACHE='rapport-ssti-v24';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./qr.html','./qrlib.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

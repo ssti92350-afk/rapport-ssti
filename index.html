@@ -166,6 +166,11 @@ main section{scroll-margin-top:110px}
 .phb{border:1px solid var(--line,#d5dbe3);background:#fff;border-radius:7px;padding:4px 7px;font-size:13px;cursor:pointer;margin-left:2px}
 .mic-b{display:inline-block;margin:6px 0 2px;border:1px solid var(--line,#d5dbe3);background:#fff;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}.mic-b.on{background:#fde8e8;border-color:#e57373;color:#b71c1c}
 @media print{.prog,.phb,.mic-b{display:none!important}}
+.gmao-box{border:1px solid var(--line,#d5dbe3);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#f6f9fc;display:grid;gap:6px}
+.gmao-box .gb-h{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.gmao-box .gb-st{font-size:12.5px;padding:2px 9px;border-radius:10px}
+.gmao-box .gb-st.ok{background:#dff5e7;color:#17663a}.gmao-box .gb-st.wait{background:#fdecd6;color:#9a5300}
+.gmao-box .gb-p{margin:0;font-size:13px;color:var(--muted,#5b6575)}.gmao-box .gb-err{margin:0;font-size:13px;color:#b42318}
+.gmao-box .gb-form{display:flex;gap:6px;flex-wrap:wrap}.gmao-box .gb-form input{flex:1;min-width:150px}.gmao-box .gb-a{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .oth .keep{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}.oth .keep input{width:auto;padding:0;margin:0}
 .oth-add{padding-top:8px}
 .hist-item{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px}
@@ -1586,6 +1591,102 @@ if(SR){const mic=document.createElement('button');mic.type='button';mic.classNam
 /* Bouton « Étiquette QR » : ouvre le générateur avec la machine du rapport */
 $('qrBtn').addEventListener('click',()=>{const p=new URLSearchParams();['client','contact','adresse','cpville','fab','modele','sn'].forEach(k=>{const v=$(k).value.trim();if(v)p.set(k,v)});p.set('type',type);
   window.open('qr.html?'+p.toString(),'_blank','noopener')});
+</script>
+<script>
+/* ===== Envoi automatique des rapports vers la GMAO (table rapports_intervention) =====
+   Dans la GMAO (cadre /ssti) : la GMAO fournit la session de l'utilisateur connecté.
+   Ouvert seul (QR code, hors GMAO) : connexion une fois avec ses identifiants GMAO.
+   Les rapports restent sur l'appareil et partent dès qu'il y a internet ; un identifiant fixe par rapport évite les doublons. */
+(()=>{
+const G={url:'https://ocvmabxnmvbrvqpouqae.supabase.co',key:'sb_publishable_xnPZV1U4PFySdG9W1kqm-A_JYFRgiZ2',app:'https://weld-loaner-ledger.lovable.app/'};
+const IN_FRAME=window.parent!==window;
+const okOrigin=o=>/^https:\/\/([a-z0-9-]+\.)*(lovable\.app|lovableproject\.com)$/.test(o);
+const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
+let S=IN_FRAME?null:LS('ssti_gmao_sess');           // session (hors cadre : connexion propre au formulaire)
+let SY=LS('ssti_gmao_sync')||{};                     // id de rapport -> version envoyée (updatedAt)
+let DEV=LS('ssti_gmao_dev');if(!DEV){DEV=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));LS('ssti_gmao_dev',DEV)}
+let busy=false,lastErr='',lastOk=0,frameWait=null;
+const H=t=>({apikey:G.key,Authorization:'Bearer '+(t||G.key),'Content-Type':'application/json'});
+
+/* Session */
+if(IN_FRAME){addEventListener('message',e=>{if(!okOrigin(e.origin)||e.source!==window.parent)return;const d=e.data;if(!d||d.type!=='gmao-session')return;
+  S=d.access_token?{access_token:d.access_token,expires_at:d.expires_at,email:d.email,frame:true}:null;if(frameWait){frameWait();frameWait=null}render();if(S)soon(500)})}
+function askParent(){return new Promise(ok=>{frameWait=ok;try{window.parent.postMessage({type:'ssti-need-session'},'*')}catch(e){}setTimeout(()=>{if(frameWait){frameWait=null;ok()}},4000)})}
+async function token(){
+  if(S&&S.expires_at&&S.expires_at*1000-Date.now()>90000)return S.access_token;
+  if(IN_FRAME){await askParent();return S&&S.access_token}
+  if(!S||!S.refresh_token)return null;
+  const r=await fetch(G.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:H(),body:JSON.stringify({refresh_token:S.refresh_token})});
+  if(!r.ok){if(r.status===400||r.status===401){S=null;LS('ssti_gmao_sess',null);lastErr='Connexion à la GMAO expirée : reconnectez-vous.'}return null}
+  const j=await r.json();S={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at,email:(j.user&&j.user.email)||S.email};LS('ssti_gmao_sess',S);return S.access_token}
+async function login(email,pw){const r=await fetch(G.url+'/auth/v1/token?grant_type=password',{method:'POST',headers:H(),body:JSON.stringify({email:email.trim().toLowerCase(),password:pw})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(r.status===400?'Adresse e-mail ou mot de passe incorrect':'Connexion impossible ('+r.status+')');
+  S={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at,email:j.user&&j.user.email};LS('ssti_gmao_sess',S)}
+function logout(){if(S&&S.access_token&&!IN_FRAME)fetch(G.url+'/auth/v1/logout',{method:'POST',headers:H(S.access_token)}).catch(()=>{});S=null;LS('ssti_gmao_sess',null);render()}
+
+/* Données */
+async function uuidFor(id){const b=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('ssti-rapport|'+DEV+'|'+id))).slice(0,16);
+  b[6]=(b[6]&0x0f)|0x40;b[8]=(b[8]&0x3f)|0x80;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`}
+const pending=()=>HIST.filter(r=>SY[r.id]!==r.updatedAt);
+function donnees(r){const d={...r.data,DOCS:(r.data.DOCS||[]).map(x=>({name:x.name,size:x.size,img:!!x.img,...(x.img?{src:x.src,w:x.w,h:x.h}:{})})),
+    source:'rapport-ssti',appareil:DEV,rapport_local:r.id,genere_le:new Date(r.firstAt).toISOString(),modifie_le:new Date(r.updatedAt).toISOString()};
+  let s=JSON.stringify(d);
+  if(s.length>4e6){d.DOCS=d.DOCS.map(x=>({name:x.name,size:x.size,img:x.img}));d.documents_omis=true;s=JSON.stringify(d)}
+  if(s.length>4e6){d.PHOTOS=(d.PHOTOS||[]).map(p=>({cap:p.cap}));d.photos_omises=true}
+  return d}
+const isProvRec=r=>!!(r.data&&r.data.f&&r.data.f.riProv)||/provisoire/i.test(r.ri||'');
+async function nextNumero(t,r){const pret=r.data&&r.data.kind==='pret',year=(/^(\d{4})/.exec(r.ri||'')||[])[1]||String((r.dateInt||'').slice(0,4)||new Date().getFullYear()),pre=pret?'SP':'S';
+  const q=await fetch(`${G.url}/rest/v1/rapports_intervention?select=numero,provisoire&provisoire=eq.false&numero=ilike.${year}-${pre}*`,{headers:H(t)});
+  if(!q.ok)return '';const rows=await q.json(),re=new RegExp('^\\s*'+year+'\\s*-\\s*'+pre+'\\s*(\\d+)\\s*$','i');let max=0;
+  rows.forEach(x=>{const m=re.exec(x.numero||'');if(m)max=Math.max(max,+m[1])});return max?`${year}-${pre}${max+1}`:''}
+async function applyNumero(r,num){r.ri=num;r.data={...r.data,f:{...r.data.f,ri:num,riProv:false}};
+  await idbDo('readwrite',st=>st.put(r,r.id),'h');
+  if(CUR&&CUR.id===r.id){$('riProv').checked=false;syncRi();$('ri').value=num;$('ri').dispatchEvent(new Event('input',{bubbles:true}));scheduleDraft()}
+  toast(`N° ${num} attribué par la GMAO au rapport ${r.client||''}. Régénérez le PDF pour l'imprimer avec ce numéro.`)}
+
+async function syncNow(manual){if(busy)return;if(!navigator.onLine){lastErr='Pas d\'internet : envoi dès le retour du réseau.';render();return}
+  const P=pending();if(!P.length&&!manual){render();return}
+  busy=true;render();let sent=0;
+  try{const t=await token();if(!t){if(!lastErr)lastErr=IN_FRAME?'Session GMAO indisponible.':'';return}
+    for(const r0 of P){const r=HIST.find(x=>x.id===r0.id)||r0;
+      if(isProvRec(r)){const n=await nextNumero(t,r);if(n)await applyNumero(r,n)}
+      const f=(r.data&&r.data.f)||{},body={id:await uuidFor(r.id),numero:r.ri||null,provisoire:isProvRec(r),type_machine:r.typeNom||null,client:r.client||null,ville:r.ville||null,
+        modele:r.modele||null,numero_serie:r.sn||null,date_intervention:/^\d{4}-\d{2}-\d{2}$/.test(r.dateInt||'')?r.dateInt:null,
+        conforme:(r.data&&r.data.choices&&r.data.choices.conforme)||null,valide_par:r.validBy||null,versions:r.versions||1,donnees:donnees(r),updated_at:new Date(r.updatedAt).toISOString()};
+      const res=await fetch(G.url+'/rest/v1/rapports_intervention?on_conflict=id',{method:'POST',headers:{...H(t),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(body)});
+      if(res.status===401){S&&!IN_FRAME&&(S.expires_at=0);lastErr='Connexion GMAO à renouveler.';break}
+      if(!res.ok){const tx=await res.text().catch(()=>'');lastErr=res.status===403||/row-level|permission/i.test(tx)?'Ce compte n\'a pas accès aux rapports de la GMAO.':'Envoi refusé par la GMAO ('+res.status+').';break}
+      SY[r.id]=r.updatedAt;LS('ssti_gmao_sync',SY);sent++;lastErr=''}
+    if(sent){lastOk=Date.now();toast(`${sent} rapport${sent>1?'s':''} envoyé${sent>1?'s':''} à la GMAO`);await loadHist()}}
+  catch(e){lastErr='Envoi impossible pour l\'instant ('+(e.message||'réseau')+'). Nouvel essai automatique.'}
+  finally{busy=false;render()}}
+let st;function soon(ms){clearTimeout(st);st=setTimeout(()=>syncNow(false),ms||1500)}
+
+/* Interface : encadré dans « Rapports enregistrés » */
+const box=document.createElement('div');box.id='gmaoBox';box.className='gmao-box';$('histDet').before(box);
+function render(){const n=pending().length,tot=HIST.length,conn=!!S;
+  let h=`<div class="gb-h"><b>☁ Envoi à la GMAO</b><span class="gb-st ${n?'wait':'ok'}">${busy?'Envoi en cours…':tot?(n?`${n} rapport${n>1?'s':''} en attente`:'Tous les rapports sont dans la GMAO'):'Aucun rapport enregistré'}</span></div>`;
+  if(IN_FRAME)h+=`<p class="gb-p">Automatique : les rapports validés partent dans la GMAO${S&&S.email?' (compte '+esc(S.email)+')':''} dès qu'il y a internet.</p>`;
+  else if(conn)h+=`<p class="gb-p">Connecté à la GMAO : ${esc(S.email||'')}. Les rapports validés partent tout seuls dès qu'il y a internet.</p>`;
+  else h+=`<p class="gb-p">Pour que les rapports de cet appareil partent tout seuls dans la GMAO, connectez-vous une fois avec vos identifiants GMAO (ou ouvrez le rapport depuis la GMAO).</p>
+    <form id="gmaoLogin" class="gb-form"><input id="gmaoEmail" type="email" autocomplete="username" placeholder="Adresse e-mail GMAO" required><input id="gmaoPw" type="password" autocomplete="current-password" placeholder="Mot de passe" required><button class="btn btn-main" type="submit">Se connecter</button></form>`;
+  if(lastErr)h+=`<p class="gb-err">${esc(lastErr)}</p>`;
+  h+=`<div class="gb-a">${(conn||IN_FRAME)&&n?'<button type="button" class="btn btn-line" id="gmaoNow">Envoyer maintenant</button>':''}<a class="btn btn-line" href="${G.app}rapports" target="_blank" rel="noopener">Voir les rapports dans la GMAO</a>${conn&&!IN_FRAME?'<button type="button" class="link" id="gmaoOut">Se déconnecter</button>':''}</div>`;
+  box.innerHTML=h}
+box.addEventListener('click',ev=>{if(ev.target.id==='gmaoNow')syncNow(true);if(ev.target.id==='gmaoOut')logout()});
+box.addEventListener('submit',async ev=>{ev.preventDefault();const b=box.querySelector('button[type=submit]');b.disabled=true;b.textContent='Connexion…';
+  try{await login($('gmaoEmail').value,$('gmaoPw').value);lastErr='';toast('Connecté à la GMAO');render();syncNow(true)}
+  catch(e){lastErr=e.message;render()}});
+
+/* Déclencheurs : ouverture, retour du réseau, rapport validé, toutes les 2 minutes */
+{const sh=saveHist;saveHist=async function(){await sh.apply(this,arguments);render();soon(1200)}}
+{const lh=loadHist;loadHist=async function(){await lh.apply(this,arguments);render()}}
+addEventListener('online',()=>soon(800));
+setInterval(()=>{if(pending().length)syncNow(false)},120000);
+render();setTimeout(()=>{IN_FRAME&&!S?askParent().then(()=>soon(300)):soon(300)},2500);
+window.__gmaoSync={syncNow,pending,uuidFor,state:()=>({S,SY,lastErr,IN_FRAME})};
+})();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */

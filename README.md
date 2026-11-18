@@ -18,6 +18,7 @@ Fonctionne sur téléphone, tablette et ordinateur, **même sans connexion inter
 - **Type de rapport choisi en premier** : *Rapport d'intervention* ou *Soudeuse de prêt*, puis le type de machine.
 - Deux types de machine : **thermosoudeuse à défilement** (ex. HM3010DCV) et **thermosoudeuse impulsion** (ex. HM660ASV) ; les cases s'adaptent au type choisi.
 - **Autre type de soudeuse** : rubriques, points de contrôle (Contrôlé / Remplacé / N/A ou Oui / Non) et mesures modifiables selon la machine, avec le nom du type de soudeuse ; enregistrables comme **modèles** sur l'appareil pour les réutiliser.
+- **Envoi automatique à la GMAO** (encadré « ☁ Envoi à la GMAO » dans « Rapports enregistrés ») : chaque rapport validé part dans la table `rapports_intervention` de la GMAO dès qu'il y a internet. Dans la GMAO (/ssti), la session de l'utilisateur connecté est fournie par la GMAO ; ouvert seul, connexion une fois avec ses identifiants GMAO. Identifiant fixe par rapport (pas de doublon) ; un rapport provisoire reçoit le numéro suivant de l'année (AAAA-Snnn, ou AAAA-SPnnn pour un prêt). Liste dans la GMAO : /rapports.
 - **Barre de progression et menu « Aller à »** sous la barre du haut : nombre de rubriques remplies, état de chaque rubrique (complète / à compléter / vide / facultative), accès direct à une rubrique.
 - **Photo sur une ligne** de contrôle (bouton 📷) : la photo va dans « Photos » avec la légende « Rubrique – ligne ».
 - **Dictée vocale** (bouton 🎤 Dicter) dans les champs de commentaire, si le navigateur la permet.
