@@ -244,6 +244,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="f int-only"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
     <div class="f int-only"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
     <div class="f int-only"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
+    <div class="f pret-only"><label for="pCompteur">Compteur de pièces</label><input id="pCompteur" class="mono" inputmode="numeric" placeholder="896 839">
+      <label class="prov"><input type="checkbox" id="pCompteurNA"> N/A – pas de compteur de pièces</label></div>
   </div></section>
 
   <div id="prevNotice" class="int-only" hidden></div>
@@ -904,7 +906,7 @@ function buildPdf(){
   const ck=id=>$(id).checked,wu=(x,u)=>x?(x.toLowerCase().endsWith(u.toLowerCase())?x:x+' '+u):'';
   open(nn(),'Type de rapport');fields([['Type de rapport','Soudeuse de prêt'],['Modèle de soudeuse',t.nom],['N° de rapport (RSP)',riVal()],['Date de départ',fmtD(v('date'))]],4);close();
   open(nn(),'Client');fields([['Client',v('client')],['Contact',v('contact')],['Adresse',v('adresse')],['Code postal / Ville',v('cpville')],['Pays',v('pays')]],3);close();
-  open(nn(),'Équipement');fields([['Équipement','Soudeuse de prêt'],['Fabricant',v('fab')],['Désignation du type',v('modele')],['N° de série',v('sn')]],4);close();
+  open(nn(),'Équipement');fields([['Équipement','Soudeuse de prêt'],['Fabricant',v('fab')],['Désignation du type',v('modele')],['N° de série',v('sn')],['Compteur de pièces',$('pCompteurNA').checked?'N/A':v('pCompteur')]],3);close();
   open(nn(),'Équipement de mesure utilisé');{const used=EQ.filter(e=>sel.has(e.id));
     if(!used.length){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(150);doc.text('Aucun appareil sélectionné',IX,y+4);y+=7}
     used.forEach((e,i)=>{pageCheck(11);if(i){doc.setDrawColor(...LINE);doc.line(IX,y,IX+IW,y)}
@@ -1362,7 +1364,11 @@ function renumber(){let n=1;document.querySelectorAll('main section').forEach(s=
 {const rt=renderType;renderType=function(){document.body.dataset.mtype=type;rt.apply(this,arguments);renumber()}}
 function renderInteg(){document.querySelector('[data-key="pret|integ"]').innerHTML=chipsHTML('pret|integ','ok')}
 function syncEmbAutre(){$('pEmbAutreF').hidden=!$('pEmbAutreChk').checked}
-function applyKind(){const P=isPret();document.body.dataset.kind=kind;document.body.dataset.mtype=type;
+/* Compteur de pièces (prêt) : N/A pour les machines sans compteur */
+function syncCpt(){const na=$('pCompteurNA').checked,e=$('pCompteur');e.disabled=na;if(na)e.value='';e.placeholder=na?'Sans compteur':'896 839'}
+$('pCompteurNA').addEventListener('change',()=>{syncCpt();if(!$('pCompteurNA').checked)$('pCompteur').focus()});
+{const cs=clearSection;clearSection=function(s){cs(s);syncCpt()}}
+function applyKind(){syncCpt();const P=isPret();document.body.dataset.kind=kind;document.body.dataset.mtype=type;
   document.querySelectorAll('#kindSel [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
   $('riLbl').textContent=P?'N° de rapport de prêt (RSP)':'N° de rapport (RI)';$('ri').placeholder=P?'2026-SP047':'2026-S323';
   $('dateLbl').textContent=P?'Date de départ':"Date d'intervention";
@@ -1390,6 +1396,7 @@ $('pEmbAutreChk').addEventListener('change',()=>{syncEmbAutre();if($('pEmbAutreC
 function valPret(){const miss=[],warn=[],t=TYPES[type],ck=id=>$(id).checked,tv=id=>$(id).value.trim();
   if(!isProv()&&!tv('ri'))miss.push('N° de rapport de prêt (ou cochez « rapport provisoire »)');
   [['client','Client'],['modele','Désignation du type'],['sn','N° de série'],['date','Date de départ']].forEach(([id,l])=>{if(!tv(id))miss.push(l)});
+  if(!ck('pCompteurNA')&&!tv('pCompteur'))warn.push('Compteur de pièces non renseigné (ou cochez N/A)');
   if(!choices['pret|integ'])miss.push('Intégrité de la soudure');
   if(!choices.conforme)miss.push('Conformité machine');
   if(!PRET_ACC.some(([id])=>ck(id))&&!tv('pAccAutre'))warn.push('Aucun accessoire coché');
