@@ -144,6 +144,12 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .sec-clear[data-armed]{color:var(--bad)}
 .oth .t{display:grid;gap:4px}.oth input{font-size:14px;padding:6px 9px}
 .oth-add{padding-top:8px}
+.hist-item{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px}
+.hist-item .hi-t{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.hist-item .hi-t b{font-family:var(--f-mono);font-size:14px}
+.hist-item .meta{font-size:12.5px;color:var(--muted)}
+.hist-item .drop{gap:6px}
+.hist-item.cur{border-color:var(--accent);background:var(--accent-soft)}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -172,6 +178,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div>
 
   <div id="certNotice"></div>
+  <div id="editNotice" hidden></div>
+
+  <section id="histSec"><h2><span class="n">🗂</span>Rapports enregistrés sur cet appareil <span id="histCount"></span></h2><div class="body">
+    <details id="histDet" style="border-top:0;padding-top:0"><summary>Rappeler un rapport déjà généré pour le modifier</summary>
+      <div class="mgr">
+        <input id="histQ" type="search" placeholder="Rechercher : n° de rapport, client, modèle, n° de série…" autocomplete="off">
+        <div id="histList" class="mgr"></div>
+      </div>
+    </details>
+  </div></section>
   <div id="suiviNotice" hidden></div>
 
   <section id="ocrSec" hidden><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
@@ -787,7 +803,7 @@ function buildPdf(){
     doc.setDrawColor(...LINE);doc.roundedRect(x,y+4,sw,25,1.2,1.2,'S');if(p.used)doc.addImage(p.c.toDataURL('image/jpeg',0.92),'JPEG',x+1,y+5,sw-2,23);
     doc.roundedRect(x,y+31,sw,7,1.2,1.2,'S');doc.setFont('helvetica',nom?'bold':'normal');doc.setFontSize(9.5);doc.setTextColor(...(nom?FG:[160,166,175]));doc.text(nom||'—',x+2,y+35.8)});
   y+=41;
-  if(VALID){doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(...MUTED);doc.text(`Rapport relu et validé par ${VALID.nom} le ${VALID.date}.`,IX,y+2.5);y+=5}
+  if(VALID){doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(...MUTED);doc.text(`Rapport relu et validé par ${VALID.nom} le ${VALID.date}.`+(typeof CUR!=='undefined'&&CUR&&CUR.firstAt?` Version modifiée (1re édition le ${fmtStamp(CUR.firstAt)}).`:''),IX,y+2.5);y+=5}
   close();
   /* Annexe : photos, deux par ligne */
   if(PHOTOS.length){doc.addPage();y=14;open(nn(),'Photos ('+PHOTOS.length+')');const cw2=(IW-6)/2;
@@ -1074,24 +1090,32 @@ autoNext();renderParts();sugg();renderSuivi();renderPrev();
 /* ===== Rapport en cours : enregistré automatiquement sur l'appareil (veille, fermeture, coupure) ===== */
 const DRAFT_DB='ssti_brouillon',DRAFT_KEY='cur';
 let draftReady=false,draftTimer=null;
-function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,1);r.onupgradeneeded=()=>r.result.createObjectStore('d');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
-async function idbDo(mode,fn){const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction('d',mode),st=tx.objectStore('d'),rq=fn(st);
+function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,2);r.onupgradeneeded=()=>{const db=r.result;['d','h'].forEach(s=>{if(!db.objectStoreNames.contains(s))db.createObjectStore(s)})};r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
+async function idbDo(mode,fn,store){store=store||'d';const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction(store,mode),st=tx.objectStore(store),rq=fn(st);
   tx.oncomplete=()=>{db.close();ok(rq&&rq.result)};tx.onerror=tx.onabort=()=>{db.close();ko(tx.error)}})}
 function draftFields(){return [...document.querySelectorAll('main input[id],main select[id],main textarea[id]')].filter(e=>e.type!=='file'&&
-  !e.closest('#admPanel,#eqDetails,#ocrSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
+  !e.closest('#admPanel,#eqDetails,#ocrSec,#histSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
 function draftData(){const f={};draftFields().forEach(e=>f[e.id]=e.type==='checkbox'?e.checked:e.value);
   return{v:1,savedAt:Date.now(),type,choices,sel:[...sel],MES,PHOTOS,DOCS,IPARTS,nextManual,riSaved,auto:[...AUTO],doutes:OCR_DOUTES,
-    sigs:pads.map(p=>p.used?p.c.toDataURL('image/png'):null),OTHERS,f}}
+    sigs:pads.map((p,i)=>p.used?(sigCache[i]||(sigCache[i]=p.c.toDataURL('image/png'))):null),OTHERS,f}}
+document.addEventListener('pointerup',ev=>{const c=ev.target.closest&&ev.target.closest('canvas');if(c)sigCache[c.id==='sig1'?1:0]=null},true);
+document.addEventListener('pointerdown',ev=>{if(ev.target.closest&&ev.target.closest('canvas'))sigCache=[sigCache[0],sigCache[1]].map((s,i)=>ev.target.id==='sig'+i?null:s)},true);
+{const ld=pads.map(p=>p.load),cl=pads.map(p=>p.clear);pads.forEach((p,i)=>{p.load=function(s){sigCache[i]=null;return ld[i].call(p,s)};p.clear=function(){sigCache[i]=null;return cl[i].call(p)}})}
 function hhmm(t){const d=new Date(t);return `${String(d.getHours()).padStart(2,'0')}h${String(d.getMinutes()).padStart(2,'0')}`}
 async function saveDraft(){if(!draftReady)return;clearTimeout(draftTimer);draftTimer=null;const d=draftData();
+  saveLight(d);
   try{await idbDo('readwrite',st=>st.put(d,DRAFT_KEY));$('draftSt').textContent='Enregistré sur l\'appareil à '+hhmm(d.savedAt)}
   catch(e){/* Sans IndexedDB : on garde au moins les textes et les choix (sans photos ni documents) */
     try{localStorage.setItem('ssti_brouillon',JSON.stringify({...d,PHOTOS:[],DOCS:[]}));$('draftSt').textContent='Enregistré (sans photos) à '+hhmm(d.savedAt)}
     catch(e2){$('draftSt').textContent='Enregistrement automatique indisponible'}}}
-function scheduleDraft(){if(!draftReady)return;clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,700)}
+/* Copie immédiate à chaque saisie (sans photos ni documents) : rien n'est perdu même si l'appareil coupe l'appli d'un coup */
+let sigCache=[null,null];
+function saveLight(d){try{d=d||draftData();localStorage.setItem('ssti_brouillon',JSON.stringify({...d,PHOTOS:[],DOCS:[],light:true}))}catch(e){}}
+function scheduleDraft(){if(!draftReady)return;saveLight();clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,700)}
 async function clearDraft(){try{await idbDo('readwrite',st=>st.delete(DRAFT_KEY))}catch(e){}try{localStorage.removeItem('ssti_brouillon')}catch(e){}$('draftSt').textContent=''}
-async function readDraft(){try{const d=await idbDo('readonly',st=>st.get(DRAFT_KEY));if(d)return d}catch(e){}
-  try{return JSON.parse(localStorage.getItem('ssti_brouillon'))}catch(e){return null}}
+async function readDraft(){let a=null,b=null;try{a=await idbDo('readonly',st=>st.get(DRAFT_KEY))}catch(e){}
+  try{b=JSON.parse(localStorage.getItem('ssti_brouillon'))}catch(e){}
+  if(b&&(!a||b.savedAt>a.savedAt))return{...b,PHOTOS:(a&&a.PHOTOS)||[],DOCS:(a&&a.DOCS)||[]};return a||b}
 ['input','change','click','pointerup'].forEach(t=>document.addEventListener(t,scheduleDraft));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraft()});
 addEventListener('pagehide',saveDraft);
@@ -1119,7 +1143,7 @@ function draftHasContent(d){if(!d||!d.f)return false;const f=d.f;
 {const r2=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r2.call(this);if(armed){draftReady=false;clearDraft().then(()=>{draftReady=true})}}}
 
 /* ===== Bouton « Effacer » par rubrique ===== */
-function addClearBtns(){document.querySelectorAll('main section').forEach(s=>{if(s.matches('#ocrSec,#admPanel')||s.querySelector('#suiviSec'))return;
+function addClearBtns(){document.querySelectorAll('main section').forEach(s=>{if(s.matches('#ocrSec,#admPanel,#histSec')||s.querySelector('#suiviSec'))return;
   const h2=s.querySelector(':scope>h2');if(!h2||h2.querySelector('.sec-clear'))return;
   h2.insertAdjacentHTML('beforeend','<button type="button" class="link sec-clear" data-secclr>Effacer</button>')})}
 {const rt=renderType;renderType=function(){rt.apply(this,arguments);addClearBtns()}}
@@ -1148,6 +1172,44 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-secclr]'
   delete b.dataset.armed;b.textContent='Effacer';const s=b.closest('section');clearSection(s);
   toast('Rubrique « '+(s.querySelector('h2').childNodes[1]?.textContent||'').trim()+' » effacée')});
 addClearBtns();
+
+/* ===== Rapports enregistrés : rappeler un rapport déjà généré et le modifier ===== */
+let CUR=null,HIST=[];
+function fmtStamp(t){const d=new Date(t);return `${d.toLocaleDateString('fr-FR')} à ${hhmm(t)}`}
+async function loadHist(){try{const all=await idbDo('readonly',st=>st.getAll(),'h');HIST=(all||[]).sort((a,b)=>b.updatedAt-a.updatedAt)}catch(e){HIST=[]}renderHist()}
+function renderHist(){const q=nzs($('histQ').value),list=q?HIST.filter(r=>nzs([r.ri,r.client,r.modele,r.sn,r.ville].join(' ')).includes(q)):HIST;
+  $('histCount').textContent=HIST.length?`(${HIST.length})`:'';
+  $('histList').innerHTML=list.length?list.map(r=>`<div class="hist-item${CUR&&CUR.id===r.id?' cur':''}">
+    <div class="hi-t"><b>${esc(r.ri||'Sans numéro')}</b><span>${esc(r.client||'Client non renseigné')}</span><span class="meta">${esc([r.modele,r.sn?'sn°'+r.sn:''].filter(Boolean).join(' '))}</span></div>
+    <div class="meta">${esc(r.typeNom||'')}${r.dateInt?' · intervention du '+esc(fmtD(r.dateInt)):''} · généré le ${fmtStamp(r.firstAt)}${r.versions>1?` · modifié ${r.versions-1} fois (dernière fois le ${fmtStamp(r.updatedAt)})`:''}${r.validBy?' · validé par '+esc(r.validBy):''}</div>
+    <div class="drop">${CUR&&CUR.id===r.id?'<span class="pill ok">Ouvert dans le formulaire</span>':`<button type="button" class="btn btn-line" data-hopen="${r.id}">Modifier ce rapport</button>`}<button type="button" class="btn btn-line" data-hdel="${r.id}">Supprimer</button></div></div>`).join('')
+    :`<div class="empty">${HIST.length?'Aucun rapport ne correspond à la recherche.':'Aucun rapport pour l\'instant. Chaque rapport validé et généré en PDF est enregistré ici, sur cet appareil, et peut être rappelé pour être corrigé.'}</div>`}
+function renderEdit(){const el=$('editNotice');if(!CUR){el.hidden=true;el.innerHTML='';renderHist();return}
+  const r=HIST.find(x=>x.id===CUR.id);el.hidden=false;
+  el.innerHTML=`<div class="notice warn"><b>Modification du rapport ${esc((r&&r.ri)||riVal()||'')}</b><span>Généré le ${fmtStamp(CUR.firstAt)}. Corrigez ce qui doit l'être puis « Générer le PDF » : la version corrigée remplacera l'ancienne dans les rapports enregistrés, et le PDF portera la mention « Version modifiée ».</span></div>`;renderHist()}
+async function saveHist(){if(!VALID)return;const now=Date.now(),d=draftData(),id=(CUR&&CUR.id)||('r'+now.toString(36)),old=HIST.find(x=>x.id===id);
+  const rec={id,ri:riVal(),client:$('client').value.trim(),ville:$('cpville').value.trim(),modele:$('modele').value.trim(),sn:$('sn').value.trim(),typeNom:TYPES[type].nom,dateInt:$('date').value,
+    firstAt:old?old.firstAt:now,updatedAt:now,versions:(old?old.versions:0)+1,validBy:VALID.nom,data:{...d,cur:null}};
+  try{await idbDo('readwrite',st=>st.put(rec,id),'h');CUR={id,firstAt:rec.firstAt};await loadHist();
+    const extra=HIST.slice(100);for(const x of extra)await idbDo('readwrite',st=>st.delete(x.id),'h');if(extra.length)await loadHist();
+    renderEdit();scheduleDraft();$('draftSt').textContent='Rapport enregistré – modifiable dans « Rapports enregistrés »'}
+  catch(e){toast('Le rapport n\'a pas pu être enregistré sur cet appareil.')}}
+{const vg2=$('valGo').onclick;$('valGo').onclick=async function(){await vg2.call(this);await saveHist()}}
+{const dd=draftData;draftData=function(){return{...dd(),cur:CUR}}}
+{const ad=applyDraft;applyDraft=function(d){ad(d);CUR=d.cur||null;renderEdit()}}
+$('histQ').addEventListener('input',renderHist);
+$('histList').addEventListener('click',async ev=>{
+  const del=ev.target.closest('[data-hdel]');if(del){if(!del.dataset.armed){del.dataset.armed=1;del.textContent='Confirmer la suppression';setTimeout(()=>{if(del.isConnected){delete del.dataset.armed;del.textContent='Supprimer'}},4000);return}
+    const id=del.dataset.hdel;try{await idbDo('readwrite',st=>st.delete(id),'h')}catch(e){}if(CUR&&CUR.id===id){CUR=null;renderEdit();scheduleDraft()}await loadHist();toast('Rapport supprimé de la liste');return}
+  const op=ev.target.closest('[data-hopen]');if(!op)return;const r=HIST.find(x=>x.id===op.dataset.hopen);if(!r)return;
+  const busy=draftHasContent(draftData())&&!(CUR&&CUR.id===r.id);
+  if(busy&&!op.dataset.armed){op.dataset.armed=1;op.textContent='Confirmer : remplace le rapport en cours';setTimeout(()=>{if(op.isConnected){delete op.dataset.armed;op.textContent='Modifier ce rapport'}},5000);return}
+  initMes();Object.keys(TYPES).forEach(t=>OTHERS[t]={});pads.forEach(p=>p.clear());choices={};sel.clear();AUTO.clear();VALID=null;
+  applyDraft({...r.data,cur:{id:r.id,firstAt:r.firstAt}});scheduleDraft();
+  $('histDet').open=false;window.scrollTo({top:0});toast(`Rapport ${r.ri||''} rappelé : vous pouvez le modifier`)});
+/* « Nouveau rapport » : on quitte le mode modification */
+{const r4=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r4.call(this);if(armed){CUR=null;renderEdit()}}}
+loadHist();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
