@@ -138,6 +138,10 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .val-ok{font-weight:600}
 .allok{margin-left:auto;display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .allok input{width:18px;height:18px;margin:0;accent-color:var(--accent);cursor:pointer}
+.draft-st{font-family:var(--f-body)!important;opacity:.75;font-size:11.5px!important}
+.sec-clear{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;white-space:nowrap;align-self:center}
+.allok+.sec-clear{margin-left:4px}
+.sec-clear[data-armed]{color:var(--bad)}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -152,7 +156,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 </style>
 
 <div class="bar"><div class="bar-in">
-  <div class="bar-title">Rapport d'intervention<small id="barRi">RI n° —</small></div>
+  <div class="bar-title">Rapport d'intervention<small id="barRi">RI n° —</small><small id="draftSt" class="draft-st"></small></div>
   <button class="btn btn-ghost" id="btnReset" type="button">Nouveau rapport</button>
   <button class="btn btn-main" id="btnPdf" type="button">Générer le PDF</button>
 </div></div>
@@ -616,7 +620,8 @@ const pads=[0,1].map(i=>{const c=$('sig'+i),x=c.getContext('2d');let down=false,
   c.addEventListener('pointermove',e=>{if(!down)return;x.lineTo(...p(e));x.stroke()});
   ['pointerup','pointercancel'].forEach(t=>c.addEventListener(t,()=>down=false));
   fit();new ResizeObserver(fit).observe(c);
-  return{c,clear(){used=false;fit()},get used(){return used}}});
+  return{c,clear(){used=false;fit()},get used(){return used},
+    load(src){if(!src)return;used=true;const im=new Image();im.onload=()=>{const r=c.getBoundingClientRect();x.drawImage(im,0,0,r.width,r.height)};im.src=src}}});
 document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>pads[+b.dataset.clear].clear());
 
 /* Nouveau rapport (confirmation dans la page) */
@@ -1043,6 +1048,81 @@ async function icsFor(r){if(!r||!r.next){toast('Indiquez la date du prochain pr�
   if(armed){IPARTS=[];$('intObs').value='';$('intNew').value='';nextManual=false;$('intLead').value='30';autoNext();renderParts();renderPrev()}}}
 $('typeSel').addEventListener('click',()=>setTimeout(sugg));
 autoNext();renderParts();sugg();renderSuivi();renderPrev();
+
+/* ===== Rapport en cours : enregistré automatiquement sur l'appareil (veille, fermeture, coupure) ===== */
+const DRAFT_DB='ssti_brouillon',DRAFT_KEY='cur';
+let draftReady=false,draftTimer=null;
+function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,1);r.onupgradeneeded=()=>r.result.createObjectStore('d');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)}catch(e){ko(e)}})}
+async function idbDo(mode,fn){const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction('d',mode),st=tx.objectStore('d'),rq=fn(st);
+  tx.oncomplete=()=>{db.close();ok(rq&&rq.result)};tx.onerror=tx.onabort=()=>{db.close();ko(tx.error)}})}
+function draftFields(){return [...document.querySelectorAll('main input[id],main select[id],main textarea[id]')].filter(e=>e.type!=='file'&&
+  !e.closest('#admPanel,#eqDetails,#ocrSec')&&!/^(m_|mc_|cap_|allok_|ech_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
+function draftData(){const f={};draftFields().forEach(e=>f[e.id]=e.type==='checkbox'?e.checked:e.value);
+  return{v:1,savedAt:Date.now(),type,choices,sel:[...sel],MES,PHOTOS,DOCS,IPARTS,nextManual,riSaved,auto:[...AUTO],doutes:OCR_DOUTES,
+    sigs:pads.map(p=>p.used?p.c.toDataURL('image/png'):null),f}}
+function hhmm(t){const d=new Date(t);return `${String(d.getHours()).padStart(2,'0')}h${String(d.getMinutes()).padStart(2,'0')}`}
+async function saveDraft(){if(!draftReady)return;clearTimeout(draftTimer);draftTimer=null;const d=draftData();
+  try{await idbDo('readwrite',st=>st.put(d,DRAFT_KEY));$('draftSt').textContent='Enregistré sur l\'appareil à '+hhmm(d.savedAt)}
+  catch(e){/* Sans IndexedDB : on garde au moins les textes et les choix (sans photos ni documents) */
+    try{localStorage.setItem('ssti_brouillon',JSON.stringify({...d,PHOTOS:[],DOCS:[]}));$('draftSt').textContent='Enregistré (sans photos) à '+hhmm(d.savedAt)}
+    catch(e2){$('draftSt').textContent='Enregistrement automatique indisponible'}}}
+function scheduleDraft(){if(!draftReady)return;clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,700)}
+async function clearDraft(){try{await idbDo('readwrite',st=>st.delete(DRAFT_KEY))}catch(e){}try{localStorage.removeItem('ssti_brouillon')}catch(e){}$('draftSt').textContent=''}
+async function readDraft(){try{const d=await idbDo('readonly',st=>st.get(DRAFT_KEY));if(d)return d}catch(e){}
+  try{return JSON.parse(localStorage.getItem('ssti_brouillon'))}catch(e){return null}}
+['input','change','click','pointerup'].forEach(t=>document.addEventListener(t,scheduleDraft));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraft()});
+addEventListener('pagehide',saveDraft);
+{const rm=renderMedia;renderMedia=function(){rm.apply(this,arguments);scheduleDraft()}}
+{const rp=renderParts;renderParts=function(){rp.apply(this,arguments);scheduleDraft()}}
+function applyDraft(d){
+  if(d.type&&TYPES[d.type])type=d.type;choices=d.choices||{};sel=new Set(d.sel||[]);
+  if(d.MES)Object.keys(TYPES).forEach(t=>{if(d.MES[t]&&Array.isArray(d.MES[t].emb)&&d.MES[t].emb.length)MES[t]=d.MES[t]});
+  PHOTOS=d.PHOTOS||[];DOCS=d.DOCS||[];IPARTS=d.IPARTS||[];nextManual=!!d.nextManual;riSaved=d.riSaved||'';
+  AUTO=new Set(d.auto||[]);OCR_DOUTES=d.doutes||[];
+  Object.entries(d.f||{}).forEach(([id,v])=>{const e=$(id);if(!e)return;if(e.type==='checkbox')e.checked=!!v;else e.value=v});
+  renderType();renderEq();renderMedia();renderParts();sugg();
+  document.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok');syncRi();renderPrev();
+  (d.sigs||[]).forEach((s,i)=>pads[i]&&pads[i].load(s));setTimeout(markAuto,50)}
+function draftHasContent(d){if(!d||!d.f)return false;const f=d.f;
+  return !!(f.client||f.ri||f.modele||f.sn||f.contact||Object.values(d.choices||{}).some(Boolean)||(d.PHOTOS||[]).length||(d.DOCS||[]).length||(d.sigs||[]).some(Boolean)||(d.sel||[]).length)}
+(async()=>{const d=await readDraft();
+  if(draftHasContent(d)){try{applyDraft(d);const dt=new Date(d.savedAt);
+    toast(`Rapport en cours retrouvé (enregistré le ${dt.toLocaleDateString('fr-FR')} à ${hhmm(d.savedAt)})`);$('draftSt').textContent='Enregistré sur l\'appareil à '+hhmm(d.savedAt)}
+    catch(e){console.error(e)}}
+  draftReady=true})();
+/* « Nouveau rapport » efface aussi le rapport enregistré */
+{const r2=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r2.call(this);if(armed){draftReady=false;clearDraft().then(()=>{draftReady=true})}}}
+
+/* ===== Bouton « Effacer » par rubrique ===== */
+function addClearBtns(){document.querySelectorAll('main section').forEach(s=>{if(s.matches('#ocrSec,#admPanel')||s.querySelector('#suiviSec'))return;
+  const h2=s.querySelector(':scope>h2');if(!h2||h2.querySelector('.sec-clear'))return;
+  h2.insertAdjacentHTML('beforeend','<button type="button" class="link sec-clear" data-secclr>Effacer</button>')})}
+{const rt=renderType;renderType=function(){rt.apply(this,arguments);addClearBtns()}}
+function resetField(e){if(e.type==='checkbox'){e.checked=e.defaultChecked;return}
+  if(e.tagName==='SELECT'){const o=[...e.options].findIndex(o=>o.defaultSelected);e.selectedIndex=o<0?0:o;return}
+  e.value=e.id==='date'?new Date().toISOString().slice(0,10):e.defaultValue}
+function clearSection(s){const si=s.dataset.si;
+  if(si!=null){TYPES[type].sections[+si][2].forEach(i=>{const k=type+'|'+i;delete choices[k];AUTO.delete('k:'+k)});
+    s.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','false'));syncAllOk()}
+  if(s.querySelector('#mesBody')){MES[type]={emb:[newEmb(type)],com:TYPES[type].champs.map(([,dv,,com])=>com?dv:null)};
+    [...AUTO].filter(k=>/^mc?_/.test(k)).forEach(k=>AUTO.delete(k));$('mesBody').innerHTML=mesHTML()}
+  if(s.querySelector('#eqList')){sel.clear();renderEq()}
+  if(s.querySelector('#photoList')){PHOTOS=[];renderMedia()}
+  if(s.querySelector('#docList')){DOCS=[];renderMedia()}
+  if(s.querySelector('[data-key="conforme"]')){delete choices.conforme;AUTO.delete('k:conforme');pads.forEach(p=>p.clear());
+    s.querySelector('[data-key="conforme"]').innerHTML=chipsHTML('conforme','ok')}
+  if(s.id==='intSec'){IPARTS=[];nextManual=false;renderParts()}
+  s.querySelectorAll('input[id],select[id],textarea[id]').forEach(e=>{if(e.type==='file'||e.closest('#eqDetails,#mesBody')||/^(allok_|cap_|ech_)/.test(e.id))return;resetField(e);AUTO.delete(e.id)});
+  if(s.querySelector('#riProv')){riSaved='';syncRi()}
+  if(s.id==='intSec')autoNext();
+  if(s.querySelector('#prochaine'))autoNext();
+  s.querySelectorAll('.auto').forEach(e=>e.classList.remove('auto'));scheduleDraft()}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-secclr]');if(!b)return;ev.preventDefault();
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='Confirmer l\'effacement';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Effacer'}},4000);return}
+  delete b.dataset.armed;b.textContent='Effacer';const s=b.closest('section');clearSection(s);
+  toast('Rubrique « '+(s.querySelector('h2').childNodes[1]?.textContent||'').trim()+' » effacée')});
+addClearBtns();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
