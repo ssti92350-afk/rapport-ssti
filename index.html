@@ -152,6 +152,7 @@ body[data-mtype="impul"] .pv-defil,body[data-mtype="defil"] .pv-impul,body:not([
 .allok+.sec-clear{margin-left:4px}
 .sec-clear[data-armed]{color:var(--bad)}
 .oth .t{display:grid;gap:4px}.oth input{font-size:14px;padding:6px 9px}
+.oth .keep{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}.oth .keep input{width:auto;padding:0;margin:0}
 .oth-add{padding-top:8px}
 .hist-item{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px}
 .hist-item .hi-t{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
@@ -651,29 +652,49 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('.chip');if(!b)
 function allOkValue(item,set){if(set==='yn')return'Oui';if(set==='ok')return'Conforme';
   return /^(inspection|nettoyage|mise en route|contr[ôo]le|v[ée]rification|[ée]talonnage|synchronisation|calibration)/i.test(item.trim())?'Contrôlé':'Remplacé'}
 function syncAllOk(){const t=TYPES[type];document.querySelectorAll('[data-allok]').forEach(cb=>{const s=t.sections[+cb.dataset.allok];if(!s)return;
-  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))&&othLines(+cb.dataset.allok).every(o=>choices[o.k]==='Remplacé')})}
-/* « Autre » pièce dans les rubriques pièces (Contrôlé / Remplacé / N/A) */
+  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))&&othLines(+cb.dataset.allok).every(o=>choices[o.k]===allOkValue(o.name,set))})}
+/* Lignes ajoutées dans chaque rubrique : intitulé, réponse, commentaire facultatif, option « garder pour les prochains rapports » */
 let OTHERS={};Object.keys(TYPES).forEach(t=>OTHERS[t]={});
 const othKey=(si,id)=>`${type}|autre|${si}|${id}`;
 function othList(si){return (OTHERS[type][si]=OTHERS[type][si]||[])}
 function othLines(si){return othList(si).filter(o=>o.name.trim()).map(o=>({k:othKey(si,o.id),name:o.name.trim()}))}
-function othHTML(si){return othList(si).map(o=>`<div class="row oth"><span class="t"><label class="lbl" for="oth_${type}_${si}_${o.id}">Autre pièce – préciser</label><input id="oth_${type}_${si}_${o.id}" data-oth="${si}|${o.id}" value="${esc(o.name)}" placeholder="Ex. capteur de pression, connecteur…"></span>
-    <div class="chips">${chipsHTML(othKey(si,o.id),'chk')}<button type="button" class="link" data-othrm="${si}|${o.id}">Retirer</button></div></div>`).join('')+
-  `<div class="oth-add"><button type="button" class="btn btn-line" data-othadd="${si}">+ Autre pièce</button></div>`}
-function renderOthers(only){const t=TYPES[type];t.sections.forEach(([,set],si)=>{if(set!=='chk'||(only!=null&&only!==si))return;
+/* Lignes gardées : enregistrées sur l'appareil, par type de machine et par nom de rubrique */
+const LK='ssti_lignes';
+let KEEPL=(()=>{try{const v=JSON.parse(localStorage.getItem(LK));if(v&&typeof v==='object'&&!Array.isArray(v))return v}catch(e){}return {}})();
+function saveKeep(){try{localStorage.setItem(LK,JSON.stringify(KEEPL))}catch(e){toast('Ligne non gardée (mémoire de l\'appareil pleine ?)')}}
+function keepSet(si,o,on){const s=TYPES[type].sections[+si];if(!s)return;const T=KEEPL[type]=KEEPL[type]||{},L=T[s[0]]=T[s[0]]||[],i=L.findIndex(x=>x.id===o.id);
+  if(on){const e={id:o.id,name:o.name};if(i<0)L.push(e);else L[i]=e}else if(i>=0)L.splice(i,1);
+  if(!L.length)delete T[s[0]];saveKeep()}
+function applyKept(tt){const K=KEEPL[tt]||{};TYPES[tt].sections.forEach(([n],si)=>{(K[n]||[]).forEach(e=>{const L=(OTHERS[tt][si]=OTHERS[tt][si]||[]);
+  if(!L.some(x=>x.id===e.id))L.push({id:e.id,name:e.name,txt:'',keep:true})})})}
+function applyKeptAll(){Object.keys(TYPES).forEach(applyKept)}
+applyKeptAll();
+function othHTML(si){const set=TYPES[type].sections[si][1];return othList(si).map(o=>`<div class="row oth"><span class="t"><label class="lbl" for="oth_${type}_${si}_${o.id}">Ligne ajoutée – intitulé</label><input id="oth_${type}_${si}_${o.id}" data-oth="${si}|${o.id}" value="${esc(o.name)}" placeholder="Ex. capteur de pression, connecteur…">
+    <input id="othtxt_${type}_${si}_${o.id}" data-othtxt="${si}|${o.id}" value="${esc(o.txt||'')}" placeholder="Commentaire (facultatif)" aria-label="Commentaire (facultatif)">
+    <label class="keep"><input type="checkbox" data-othkeep="${si}|${o.id}" ${o.keep?'checked':''}> Garder pour les prochains rapports de cette machine</label></span>
+    <div class="chips">${chipsHTML(othKey(si,o.id),set)}<button type="button" class="link" data-othrm="${si}|${o.id}">Retirer</button></div></div>`).join('')+
+  `<div class="oth-add"><button type="button" class="btn btn-line" data-othadd="${si}">+ Ajouter une ligne</button></div>`}
+function renderOthers(only){const t=TYPES[type];t.sections.forEach(([,set],si)=>{if(only!=null&&only!==si)return;
   const body=document.querySelector(`#dyn section[data-si="${si}"]>.body`);if(!body)return;
   let box=body.querySelector('.oth-box');if(!box){box=document.createElement('div');box.className='oth-box';body.appendChild(box)}box.innerHTML=othHTML(si)});syncAllOk()}
-document.addEventListener('input',ev=>{const d=ev.target.dataset&&ev.target.dataset.oth;if(!d)return;const[si,id]=d.split('|'),o=othList(+si).find(x=>x.id===id);if(o){o.name=ev.target.value;syncAllOk()}});
-document.addEventListener('click',ev=>{const a=ev.target.closest('[data-othadd]');if(a){const si=+a.dataset.othadd,o={id:Date.now().toString(36),name:''};othList(si).push(o);renderOthers(si);
+function othFind(d){const[si,id]=d.split('|');return{si,o:othList(+si).find(x=>x.id===id)}}
+document.addEventListener('input',ev=>{const ds=ev.target.dataset||{};
+  if(ds.othtxt){const{o}=othFind(ds.othtxt);if(o)o.txt=ev.target.value;return}
+  if(!ds.oth)return;const{si,o}=othFind(ds.oth);if(o){o.name=ev.target.value;if(o.keep)keepSet(si,o,true);syncAllOk()}});
+document.addEventListener('change',ev=>{const d=ev.target.dataset&&ev.target.dataset.othkeep;if(!d)return;const{si,o}=othFind(d);if(!o)return;
+  o.keep=ev.target.checked;keepSet(si,o,o.keep);
+  toast(o.keep?'Cette ligne reviendra dans les prochains rapports de cette machine':'Cette ligne ne servira que pour ce rapport')});
+document.addEventListener('click',ev=>{const a=ev.target.closest('[data-othadd]');if(a){const si=+a.dataset.othadd,o={id:Date.now().toString(36),name:'',txt:'',keep:false};othList(si).push(o);renderOthers(si);
     const f=$(`oth_${type}_${si}_${o.id}`);f&&f.focus();return}
   const r=ev.target.closest('[data-othrm]');if(!r)return;
   if(!r.dataset.armed){r.dataset.armed=1;r.textContent='Confirmer';setTimeout(()=>{if(r.isConnected){delete r.dataset.armed;r.textContent='Retirer'}},4000);return}
+  {const{si,o}=othFind(r.dataset.othrm);if(o&&o.keep){keepSet(si,o,false);toast('Ligne retirée, aussi des prochains rapports')}}
   const[si,id]=r.dataset.othrm.split('|');delete choices[othKey(si,id)];OTHERS[type][si]=othList(+si).filter(x=>x.id!==id);renderOthers(+si)});
 document.addEventListener('change',ev=>{const cb=ev.target.closest('[data-allok]');if(!cb)return;
   const si=+cb.dataset.allok,[, set,items]=TYPES[type].sections[si],sec=document.querySelector(`#dyn section[data-si="${si}"]`);
   items.forEach(i=>{const k=type+'|'+i,v=allOkValue(i,set);
     if(cb.checked){choices[k]=v;if(typeof AUTO!=='undefined')AUTO.delete('k:'+k)}else if(choices[k]===v)choices[k]=undefined});
-  othLines(si).forEach(o=>{if(cb.checked)choices[o.k]='Remplacé';else if(choices[o.k]==='Remplacé')choices[o.k]=undefined});
+  othLines(si).forEach(o=>{const v=allOkValue(o.name,set);if(cb.checked)choices[o.k]=v;else if(choices[o.k]===v)choices[o.k]=undefined});
   if(sec){sec.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[x.dataset.k]===x.dataset.v));sec.querySelectorAll('.row.auto').forEach(r=>r.classList.remove('auto'))}
   syncAllOk();toast(cb.checked?'Rubrique remplie – chaque ligne reste modifiable':'Rubrique vidée')});
 
@@ -854,7 +875,8 @@ function buildPdf(){
   close();
   open(nn(),'Demande formulée');fields([['Défaut signalé',v('defSig')],['Défaut constaté',v('defCons')]],2);close();
   t.sections.forEach(([nom,set,items],si)=>{open(nn(),nom);items.forEach((i,k)=>qcm(i,set,choices[type+'|'+i],k===0));
-    if(set==='chk')othList(si).forEach(o=>{const v=choices[othKey(si,o.id)];if(o.name.trim()||v)qcm('Autre : '+(o.name.trim()||'(non précisée)'),set,v,false)});close()});
+    othList(si).forEach(o=>{const v=choices[othKey(si,o.id)],tx=(o.txt||'').trim();if(!o.name.trim()&&!v&&!tx)return;qcm(o.name.trim()||'(ligne sans intitulé)',set,v,!items.length);
+      if(tx){doc.setFont('helvetica','italic');doc.setFontSize(8.5);const tl=doc.splitTextToSize(tx,IW-4);pageCheck(tl.length*3.8+2);doc.setTextColor(...MUTED);doc.text(tl,IX+3,y+1.6,{lineHeightFactor:1.25});y+=tl.length*3.8+2}});close()});
   /* Relevés : unité après la valeur, tolérance dans le libellé, un encadré par emballage */
   const S=MES[type],lab=l=>l.replace(/ \(([^)]*)\)/,(m,g)=>{const tol=g.split(',').map(s=>s.trim()).filter(s=>s.includes('±'));return tol.length?` (${tol.join(', ')})`:''});
   const withU=(val,u)=>{val=(val||'').trim();return val?(u&&!val.toLowerCase().endsWith(u.toLowerCase())?`${val} ${u}`:val):''};
@@ -957,7 +979,7 @@ function valReport(){const t=TYPES[type],S=MES[type],miss=[],warn=[];
   [['client','Client'],['modele','Modèle'],['sn','N° de série'],['date',"Date d'intervention"]].forEach(([id,l])=>{if(!$(id).value.trim())miss.push(l)});
   if(!choices.conforme)miss.push('Conformité de l\'appareil');
   const nr=[];t.sections.forEach(([,set,items],si)=>{items.forEach(i=>{if(!choices[type+'|'+i])nr.push(i)});
-    if(set==='chk')othList(si).forEach(o=>{const v=choices[othKey(si,o.id)];if(!o.name.trim()&&v)warn.push('Une « autre pièce » n\'est pas précisée');else if(o.name.trim()&&!v)nr.push('Autre : '+o.name.trim())})});
+    othList(si).forEach(o=>{const v=choices[othKey(si,o.id)];if(!o.name.trim()&&(v||(o.txt||'').trim()))warn.push('Une ligne ajoutée n\'a pas d\'intitulé');else if(o.name.trim()&&!v)nr.push(o.name.trim())})});
   if(nr.length)warn.push(`${nr.length} point(s) de contrôle non renseigné(s) : ${nr.slice(0,6).join(', ')}${nr.length>6?'…':''}`);
   if(!sel.size)warn.push('Aucun appareil de mesure sélectionné');
   const exp=EQ.filter(e=>sel.has(e.id)&&status(e).k==='bad');if(exp.length)warn.push('Appareil utilisé avec certificat expiré : '+exp.map(e=>e.n).join(', '));
@@ -1258,7 +1280,7 @@ function resetField(e){if(e.type==='checkbox'){e.checked=e.defaultChecked;return
   e.value=e.id==='date'?new Date().toISOString().slice(0,10):e.defaultValue}
 function clearSection(s){const si=s.dataset.si;
   if(si!=null){TYPES[type].sections[+si][2].forEach(i=>{const k=type+'|'+i;delete choices[k];AUTO.delete('k:'+k)});
-    othList(+si).forEach(o=>delete choices[othKey(si,o.id)]);OTHERS[type][si]=[];renderOthers(+si);
+    othList(+si).forEach(o=>delete choices[othKey(si,o.id)]);OTHERS[type][si]=[];applyKept(type);renderOthers(+si);
     s.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','false'));syncAllOk()}
   if(s.querySelector('#mesBody')){MES[type]={emb:[newEmb(type)],com:TYPES[type].champs.map(([,dv,,com])=>com?dv:null)};
     [...AUTO].filter(k=>/^mc?_/.test(k)).forEach(k=>AUTO.delete(k));$('mesBody').innerHTML=mesHTML()}
@@ -1315,6 +1337,8 @@ $('histList').addEventListener('click',async ev=>{
   $('histDet').open=false;window.scrollTo({top:0});toast(`Rapport ${r.ri||''} rappelé : vous pouvez le modifier`)});
 /* « Nouveau rapport » : on quitte le mode modification */
 {const r4=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r4.call(this);if(armed){CUR=null;renderEdit()}}}
+/* « Nouveau rapport » : les lignes gardées reviennent */
+{const r5=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r5.call(this);if(armed){applyKeptAll();renderOthers();scheduleDraft()}}}
 loadHist();
 
 /* ===== Soudeuse de prêt : type de rapport choisi avant la machine ===== */
@@ -1415,7 +1439,7 @@ function readAE(){const secs=[...document.querySelectorAll('#ae_secs [data-aesec
   return{sections:secs,champs:ch}}
 function setAutre(st){const old=AUTRE.champs.map(c=>c[0]);AUTRE={sections:st.sections.map(s=>[s[0],s[1]==='yn'?'yn':'chk',[...s[2]]]),champs:st.champs.map(c=>[c[0],c[1]||'',c[2]||''])};
   const S=MES.autre||{emb:[newEmb('autre')]};MES.autre={emb:S.emb.map(r=>AUTRE.champs.map((c,i)=>{if(i===0)return r[0]??'';const j=old.indexOf(c[0]);return j>0?(r[j]??''):''})),com:AUTRE.champs.map(()=>null)};
-  OTHERS.autre={}}
+  OTHERS.autre={};applyKept('autre')}
 {const rt=renderType;renderType=function(){rt.apply(this,arguments);if(type==='autre')$('dyn').insertAdjacentHTML('afterbegin',aeHTML())}}
 $('dyn').addEventListener('toggle',ev=>{if(ev.target.id==='ae_det')AE_OPEN=ev.target.open},true);
 $('dyn').addEventListener('click',ev=>{const id=ev.target.id;
