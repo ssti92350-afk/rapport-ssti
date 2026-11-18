@@ -108,6 +108,12 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .prov input{width:18px;height:18px;flex:none;accent-color:var(--warn)}
 #ri[readonly]{background:var(--warn-soft);color:var(--warn);font-weight:600;border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .bar-title small{overflow-wrap:anywhere}
+/* Soudeuse de prêt : champs propres à chaque type de rapport et de machine */
+body[data-kind="pret"] .int-only,body:not([data-kind="pret"]) .pret-only{display:none!important}
+body[data-mtype="impul"] .pv-defil,body:not([data-mtype="impul"]) .pv-impul{display:none!important}
+.kindsel .typecard b{font-size:15px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px}
+.checks .eq{border-bottom:1px solid var(--line)}
 @media (max-width:520px){.bar-title{flex-basis:100%}.bar-in .btn{flex:1}}
 .drop{display:flex;gap:8px;flex-wrap:wrap}
 .drop label.btn{display:inline-flex;align-items:center}
@@ -188,7 +194,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
       </div>
     </details>
   </div></section>
-  <div id="suiviNotice" hidden></div>
+  <div id="suiviNotice" class="int-only" hidden></div>
 
   <section id="ocrSec" hidden><h2><span class="n">✎</span>Remplir depuis mes notes manuscrites</h2><div class="body">
     <div id="ocrOff" class="empty">La lecture des notes manuscrites nécessite une connexion internet et fonctionne dans la version Claude du rapport. Dans cette version, remplissez le rapport à la main.</div>
@@ -205,11 +211,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div></section>
 
   <section><h2><span class="n">01</span>Type de rapport</h2><div class="body">
+    <div class="typesel kindsel" id="kindSel">
+      <button type="button" class="typecard" data-kind="int" aria-pressed="true"><b>Rapport d'intervention</b><span>Requalification après maintenance (préventif, curatif)</span></button>
+      <button type="button" class="typecard" data-kind="pret" aria-pressed="false"><b>Soudeuse de prêt</b><span>Requalification avant le départ d'une soudeuse prêtée</span></button>
+    </div>
+    <div class="lbl" id="typeSelLbl">Type de machine</div>
     <div class="typesel" id="typeSel"></div>
     <div class="grid">
-      <div class="f"><label for="ri">N° de rapport (RI)</label><input id="ri" class="mono" placeholder="2026-S323">
+      <div class="f"><label for="ri" id="riLbl">N° de rapport (RI)</label><input id="ri" class="mono" placeholder="2026-S323">
         <label class="prov"><input type="checkbox" id="riProv"> Numéro pas encore attribué : rapport provisoire</label></div>
-      <div class="f"><label for="date">Date d'intervention</label><input id="date" type="date"></div>
+      <div class="f"><label for="date" id="dateLbl">Date d'intervention</label><input id="date" type="date"></div>
     </div>
   </div></section>
 
@@ -218,18 +229,19 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="f"><label for="contact">Contact</label><input id="contact" placeholder="M. …"></div>
     <div class="f"><label for="adresse">Adresse</label><input id="adresse"></div>
     <div class="f"><label for="cpville">Code postal / Ville</label><input id="cpville" placeholder="18100 VIERZON"></div>
+    <div class="f pret-only"><label for="pays">Pays</label><input id="pays" value="France"></div>
   </div></section>
 
-  <section><h2><span class="n">03</span>Information machine</h2><div class="body grid">
+  <section><h2><span class="n">03</span><span id="machTitle">Information machine</span></h2><div class="body grid">
     <div class="f"><label for="fab">Fabricant</label><input id="fab" value="HAWO"></div>
-    <div class="f"><label for="modele">Modèle</label><input id="modele" class="mono" placeholder="HM3010DCV"></div>
+    <div class="f"><label for="modele" id="modeleLbl">Modèle</label><input id="modele" class="mono" placeholder="HM3010DCV"></div>
     <div class="f"><label for="sn">N° de série</label><input id="sn" class="mono" placeholder="438780"></div>
-    <div class="f"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
-    <div class="f"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
-    <div class="f"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
+    <div class="f int-only"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
+    <div class="f int-only"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
+    <div class="f int-only"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
   </div></section>
 
-  <div id="prevNotice" hidden></div>
+  <div id="prevNotice" class="int-only" hidden></div>
 
   <section><h2><span class="n">04</span>Équipement de mesure utilisé</h2><div class="body">
     <div id="eqList"></div>
@@ -247,12 +259,45 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     </details>
   </div></section>
 
-  <section><h2><span class="n">05</span>Demande formulée</h2><div class="body grid">
+  <section class="int-only"><h2><span class="n">05</span>Demande formulée</h2><div class="body grid">
     <div class="f"><label for="defSig">Défaut signalé</label><select id="defSig"><option>PRÉVENTIF</option><option>CURATIF</option><option>AUTRE</option></select></div>
     <div class="f"><label for="defCons">Défaut constaté</label><input id="defCons" value="Idem"></div>
   </div></section>
 
-  <div id="dyn" style="display:grid;gap:14px"></div>
+  <div id="dyn" class="int-only" style="display:grid;gap:14px"></div>
+
+  <div id="pretBox" class="pret-only" style="display:grid;gap:14px">
+    <section id="pretAcc"><h2><span class="n">05</span>Accessoires fournis</h2><div class="body"><div class="checks">
+      <label class="eq"><input type="checkbox" id="pAccGuide"><span class="d"><b>Guide sachet</b></span></label>
+      <label class="eq"><input type="checkbox" id="pAccCordon"><span class="d"><b>Cordon d'alimentation</b></span></label>
+      <label class="eq"><input type="checkbox" id="pAccPedale"><span class="d"><b>Pédale de commande</b></span></label>
+      <label class="eq"><input type="checkbox" id="pAccRuban"><span class="d"><b>Ruban encreur</b></span></label>
+    </div><div class="f"><label for="pAccAutre">Autre accessoire (facultatif)</label><input id="pAccAutre" placeholder="Ex. support rouleau, imprimante…"></div></div></section>
+    <section id="pretPreuves"><h2><span class="n">06</span>Preuves de contrôle fournies</h2><div class="body"><div class="checks">
+      <label class="eq"><input type="checkbox" id="pPrEch"><span class="d"><b>Échantillons sachets</b></span></label>
+      <label class="eq"><input type="checkbox" id="pPrSeal"><span class="d"><b>Seal check</b></span></label>
+    </div></div></section>
+    <section id="pretCrit"><h2><span class="n">07</span>Critères de soudure</h2><div class="body">
+      <div class="lbl">Type d'emballage</div>
+      <div class="checks">
+        <label class="eq"><input type="checkbox" id="pEmbBop"><span class="d"><b>BOP</b></span></label>
+        <label class="eq"><input type="checkbox" id="pEmbUltra"><span class="d"><b>ULTRA</b></span></label>
+        <label class="eq"><input type="checkbox" id="pEmbAutreChk"><span class="d"><b>Autre</b></span></label>
+      </div>
+      <div class="f" id="pEmbAutreF"><label for="pEmbAutre">Autre emballage – préciser</label><input id="pEmbAutre" placeholder="Ex. papier crêpé, Tyvek…"></div>
+      <div class="row"><span class="t">Intégrité de la soudure</span><div class="chips" data-key="pret|integ" data-set="ok"></div></div>
+      <div class="grid">
+        <div class="f"><label for="pTemp">T° de scellage (°C)</label><input id="pTemp" class="mono" inputmode="decimal" placeholder="180"></div>
+        <div class="f"><label for="pPress">Pression de scellage (N)</label><input id="pPress" class="mono" inputmode="decimal" placeholder="100"></div>
+        <div class="f pv-defil"><label for="pVit">Vitesse de scellage (m/min)</label><input id="pVit" class="mono" inputmode="decimal" placeholder="9.76"></div>
+        <div class="f pv-impul"><label for="pTs">ts – temps de soudure (s)</label><input id="pTs" class="mono" inputmode="decimal" placeholder="2"></div>
+        <div class="f pv-impul"><label for="pTc">tc – temps de refroidissement (s)</label><input id="pTc" class="mono" inputmode="decimal" placeholder="3"></div>
+      </div>
+    </div></section>
+    <section id="pretSav"><h2><span class="n">08</span>SAV / remarques</h2><div class="body">
+      <textarea id="pSav" rows="3" placeholder="Observations du SAV sur la soudeuse prêtée, date de retour prévue…"></textarea>
+    </div></section>
+  </div>
 
   <section><h2><span class="n" id="nPho">09</span>Photos</h2><div class="body">
     <div class="drop">
@@ -270,22 +315,22 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div id="docEmpty" class="empty">Aucun document. Une image (scan, bon d'intervention photographié) est imprimée pleine page en annexe ; un PDF ou un fichier Office est intégré dans le PDF en pièce jointe.</div>
   </div></section>
 
-  <section><h2><span class="n" id="nRem">09</span>Remarques / divers</h2><div class="body">
+  <section class="int-only"><h2><span class="n" id="nRem">09</span>Remarques / divers</h2><div class="body">
     <textarea id="rem" rows="3">Remplacement des éléments d'usure inclus au préventif.</textarea>
   </div></section>
 
   <section><h2><span class="n" id="nConc">10</span>Conclusion</h2><div class="body">
-    <div class="row"><span class="t">Appareil conforme</span><div class="chips" data-key="conforme" data-set="ok"></div></div>
-    <div class="grid">
+    <div class="row"><span class="t" id="confLbl">Appareil conforme</span><div class="chips" data-key="conforme" data-set="ok"></div></div>
+    <div class="grid int-only">
       <div class="f"><label for="prochaine">Prochaine révision préconisée</label><input id="prochaine" type="month"></div>
     </div>
     <div class="sigs">
       <div class="sig"><div class="sig-h"><span class="lbl">Signature technicien SAV</span><button class="link" data-clear="0" type="button">Effacer</button></div><canvas id="sig0"></canvas><input id="techNom" placeholder="Nom du technicien"></div>
-      <div class="sig"><div class="sig-h"><span class="lbl">Signature client</span><button class="link" data-clear="1" type="button">Effacer</button></div><canvas id="sig1"></canvas><input id="cliNom" placeholder="Nom du signataire client"></div>
+      <div class="sig int-only"><div class="sig-h"><span class="lbl">Signature client</span><button class="link" data-clear="1" type="button">Effacer</button></div><canvas id="sig1"></canvas><input id="cliNom" placeholder="Nom du signataire client"></div>
     </div>
   </div></section>
 
-  <section class="int" id="intSec"><h2><span class="n">🔒</span>Partie interne technicien – n'apparaît pas sur le PDF</h2><div class="body">
+  <section class="int int-only" id="intSec"><h2><span class="n">🔒</span>Partie interne technicien – n'apparaît pas sur le PDF</h2><div class="body">
     <div class="f"><label for="intObs">Observations particulières</label><textarea id="intObs" rows="3" placeholder="Accès difficile, machine à surveiller, interlocuteur, pièce à commander…"></textarea></div>
     <div class="subh">À prévoir pour la prochaine maintenance</div>
     <div id="intParts"></div>
@@ -299,7 +344,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="empty">Enregistré sur cet appareil, dans le suivi des préventifs, quand vous validez le rapport (ou avec « Enregistrer dans le suivi »). Jamais imprimé dans le PDF. À l'ouverture du rapport, une alerte apparaît en haut 1 ou 2 mois avant la date du préventif.</div>
   </div></section>
 
-  <section class="int"><h2><span class="n">⏰</span>Suivi des préventifs – interne <span id="suiviCount"></span></h2><div class="body">
+  <section class="int int-only"><h2><span class="n">⏰</span>Suivi des préventifs – interne <span id="suiviCount"></span></h2><div class="body">
     <details id="suiviSec" style="border-top:0;padding-top:0"><summary>Voir les machines suivies sur cet appareil</summary><div id="suiviList" class="mgr"></div></details>
   </div></section>
 
@@ -318,6 +363,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
       <div class="grid">
         <div class="f" style="grid-column:1/-1"><label for="cTitre">Titre du rapport</label><input id="cTitre"></div>
         <div class="f"><label for="cNorme">Ligne norme</label><input id="cNorme"></div>
+      </div>
+      <div class="subh">En-tête du rapport soudeuse de prêt</div>
+      <div class="grid">
+        <div class="f" style="grid-column:1/-1"><label for="cTitrePret">Titre du rapport de prêt</label><input id="cTitrePret"></div>
+        <div class="f"><label for="cNormePret">Ligne norme (prêt)</label><input id="cNormePret"></div>
       </div>
       <div class="subh">Logo</div>
       <div class="grid">
@@ -344,6 +394,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
         <div class="f"><label for="cDocRef_impul">Référence du document</label><input id="cDocRef_impul" class="mono" placeholder="ENR-SAV-08"></div>
         <div class="f"><label for="cDocVer_impul">Version / indice</label><input id="cDocVer_impul" class="mono" placeholder="2"></div>
         <div class="f"><label for="cDocDate_impul">Date d'application</label><input id="cDocDate_impul" type="date"></div>
+      </div>
+      <div class="lbl">Soudeuse de prêt</div>
+      <div class="grid">
+        <div class="f"><label for="cDocRef_pret">Référence du document</label><input id="cDocRef_pret" class="mono" placeholder="SSTI RSP"></div>
+        <div class="f"><label for="cDocVer_pret">Version / indice</label><input id="cDocVer_pret" class="mono" placeholder="1.0"></div>
+        <div class="f"><label for="cDocDate_pret">Date d'application</label><input id="cDocDate_pret" type="date"></div>
       </div>
       <div class="grid">
         <div class="f"><label for="cDocPos">Emplacement sur chaque page du PDF</label><select id="cDocPos"><option value="pied">En bas à gauche (pied de page)</option><option value="haut">En haut à droite</option><option value="les2">En haut à droite et en bas à gauche</option></select></div>
@@ -489,7 +545,8 @@ root.MiniPDF=MiniPDF;
 const $=id=>document.getElementById(id);
 /* Réglages verrouillés par code : modifiables uniquement par l'administrateur */
 const CONFIG_DEFAUT=JSON.parse(document.getElementById('cfgData').textContent);
-let CFG=(()=>{try{const v=JSON.parse(localStorage.getItem('ssti_cfg'));if(v&&v.hash)return {...CONFIG_DEFAUT,...v}}catch(e){}return {...CONFIG_DEFAUT}})();
+const CFG_PRET={titrePret:'RAPPORT SOUDEUSE DE PRÊT – REQUALIFICATION OPÉRATIONNELLE',normePret:'Selon NF EN ISO 11607-2',docRef_pret:'SSTI RSP',docVer_pret:'1.0'};
+let CFG=(()=>{try{const v=JSON.parse(localStorage.getItem('ssti_cfg'));if(v&&v.hash)return {...CFG_PRET,...CONFIG_DEFAUT,...v}}catch(e){}return {...CFG_PRET,...CONFIG_DEFAUT}})();
 function sha256(str){const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
   const b=new TextEncoder().encode(str),l=b.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);m.set(b);m[l]=0x80;const dv=new DataView(m.buffer);dv.setUint32(n-4,l*8);dv.setUint32(n-8,Math.floor(l/0x20000000));
   let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];const w=new Uint32Array(64),r=(x,k)=>x>>>k|x<<(32-k);
@@ -503,10 +560,10 @@ function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=fals
   $('hTitre').textContent=CFG.titre;$('hNorme').textContent=CFG.norme;
   $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`+(docLine()?`<br><span class="mono">${esc(docLine())}</span>`:'')}
 /* Référence qualité : « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 » */
-function docLine(){const g=k=>String(CFG[k+'_'+type]||'').trim(),r=g('docRef'),v=g('docVer'),d=g('docDate')?fmtD(g('docDate')):'';
+function docLine(){const g=k=>String(CFG[k+'_'+(typeof kind!=='undefined'&&kind==='pret'?'pret':type)]||'').trim(),r=g('docRef'),v=g('docVer'),d=g('docDate')?fmtD(g('docDate')):'';
   const ver=v?('Version '+v.replace(/^v(ersion)?\s*/i,'')+(d?' du '+d:'')):(d?'Applicable le '+d:'');return [r?'Réf. '+r:'',ver].filter(Boolean).join(' – ')}
 function footerLine(){return `${CFG.societe} – ${CFG.adresse} – Tél : ${CFG.tel} – ${CFG.email}`}
-const CF={cTitre:'titre',cNorme:'norme',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocPos:'docPos'};['defil','impul'].forEach(t=>['DocRef','DocVer','DocDate'].forEach(k=>CF['c'+k+'_'+t]=k[0].toLowerCase()+k.slice(1)+'_'+t));
+const CF={cTitre:'titre',cNorme:'norme',cTitrePret:'titrePret',cNormePret:'normePret',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocPos:'docPos'};['defil','impul','pret'].forEach(t=>['DocRef','DocVer','DocDate'].forEach(k=>CF['c'+k+'_'+t]=k[0].toLowerCase()+k.slice(1)+'_'+t));
 let admTries=0,admUntil=0;
 const SETS={chk:[['Contrôlé','c'],['Remplacé','r'],['N/A','n']],yn:[['Oui','c'],['Non','k']],ok:[['Conforme','c'],['Non conforme','k']]};
 const TYPES={
@@ -749,23 +806,24 @@ function buildPdf(){
     doc.setFont('helvetica','bold');doc.setFontSize(7.5);const w=doc.getTextWidth(txt)+5;doc.setFillColor(...C[0]);doc.roundedRect(xr-w,py,w,4.8,2.4,2.4,'F');
     doc.setTextColor(...C[1]);doc.text(txt,xr-w/2,py+3.3,{align:'center'})}
 
-  const t=TYPES[type];
+  const t=TYPES[type],PRET=typeof kind!=='undefined'&&kind==='pret';
   /* Bandeau supérieur, comme la barre de l'application */
-  doc.setFillColor(...BAND);doc.rect(0,0,W,15,'F');doc.setDrawColor(...LINE);doc.line(0,15,W,15);doc.setTextColor(...NAVY);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text("Rapport d'intervention",M,6.6);
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text('RI n° '+(riVal()||'—'),M,11.4);
+  doc.setFillColor(...BAND);doc.rect(0,0,W,15,'F');doc.setDrawColor(...LINE);doc.line(0,15,W,15);doc.setTextColor(...NAVY);doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.text(PRET?'Rapport soudeuse de prêt':"Rapport d'intervention",M,6.6);
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text((PRET?'RSP n° ':'RI n° ')+(riVal()||'—'),M,11.4);
   const dl=docLine(),dlTop=dl&&(CFG.docPos==='les2'||CFG.docPos==='haut'),dlBot=dl&&CFG.docPos!=='haut';
   doc.setFont('helvetica','bold');doc.setFontSize(dlTop?8:9);doc.text(dlTop?dl:(CFG.societe||''),W-M,6.6,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text((dlTop&&v('date')?'Intervention du ':'')+(fmtD(v('date'))||''),W-M,11.4,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text((dlTop&&v('date')?(PRET?'Départ le ':'Intervention du '):'')+(fmtD(v('date'))||''),W-M,11.4,{align:'right'});
   y=22;
   if(CFG.logo){const L=$('hLogo'),nw=L.naturalWidth||1,nh=L.naturalHeight||1;let lw=Math.min(CFG.logoW||35,CW),lh=lw*nh/nw;if(lh>32){lh=32;lw=lh*nw/nh}
     const lx={gauche:M,centre:(W-lw)/2,droite:M+CW-lw}[CFG.logoPos||'gauche'];doc.addImage(CFG.logo,'JPEG',lx,y,lw,lh);y+=lh+5}
   doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(...FG);
-  doc.splitTextToSize(CFG.titre,CW).forEach(l=>{doc.text(l,W/2,y,{align:'center'});y+=6});
+  doc.splitTextToSize(PRET?(CFG.titrePret||CFG.titre):CFG.titre,CW).forEach(l=>{doc.text(l,W/2,y,{align:'center'});y+=6});
   doc.setTextColor(...NAVY);doc.setFontSize(10.5);doc.text(t.titre,W/2,y,{align:'center'});y+=4.6;
-  doc.setTextColor(...MUTED);doc.setFont('helvetica','normal');doc.setFontSize(8.5);if(CFG.norme)doc.text(CFG.norme,W/2,y,{align:'center'});y+=6;
+  doc.setTextColor(...MUTED);doc.setFont('helvetica','normal');doc.setFontSize(8.5);{const nm=PRET?(CFG.normePret||CFG.norme):CFG.norme;if(nm)doc.text(nm,W/2,y,{align:'center'})}y+=6;
   if(isProv()){doc.setFillColor(253,240,225);doc.setDrawColor(180,91,8);doc.roundedRect(M,y,CW,8,2,2,'FD');doc.setTextColor(180,91,8);doc.setFont('helvetica','bold');doc.setFontSize(9);
     doc.text('RAPPORT PROVISOIRE – le rapport définitif, avec son numéro, sera transmis ultérieurement.',W/2,y+5.2,{align:'center'});y+=12}
 
+  if(!PRET){
   open(nn(),'Type de rapport');fields([['Type de machine',t.nom],['N° de rapport (RI)',riVal()],["Date d'intervention",fmtD(v('date'))]],3);close();
   open(nn(),'Client');fields([['Client',v('client')],['Contact',v('contact')],['Adresse',v('adresse')],['Code postal / Ville',v('cpville')]],4);close();
   open(nn(),'Information machine');fields([['Fabricant',v('fab')],['Modèle',v('modele')],['N° de série',v('sn')],['Version software',v('soft')],['Date de fabrication',v('dfab')],['Compteur',v('compteur')]],3);close();
@@ -797,8 +855,38 @@ function buildPdf(){
   open(nn(),'Conclusion',70);qcm('Appareil conforme','ok',choices.conforme,true);
   {const pr=fmtD(v('prochaine'));doc.setDrawColor(...LINE);doc.line(IX,y,IX+IW,y);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(...FG);doc.text('Prochaine révision préconisée',IX,y+4.8);
     doc.roundedRect(IX+IW-34,y+1,34,6,1.2,1.2,'S');doc.setFont('helvetica',pr?'bold':'normal');doc.setTextColor(...(pr?FG:[160,166,175]));doc.text(pr||'—',IX+IW-17,y+5.1,{align:'center'});y+=10}
+  }else{
+  /* ===== Rapport soudeuse de prêt (d'après le modèle « SSTI RSP ») ===== */
+  const ck=id=>$(id).checked,wu=(x,u)=>x?(x.toLowerCase().endsWith(u.toLowerCase())?x:x+' '+u):'';
+  open(nn(),'Type de rapport');fields([['Type de rapport','Soudeuse de prêt'],['Modèle de soudeuse',t.nom],['N° de rapport (RSP)',riVal()],['Date de départ',fmtD(v('date'))]],4);close();
+  open(nn(),'Client');fields([['Client',v('client')],['Contact',v('contact')],['Adresse',v('adresse')],['Code postal / Ville',v('cpville')],['Pays',v('pays')]],3);close();
+  open(nn(),'Équipement');fields([['Équipement','Soudeuse de prêt'],['Fabricant',v('fab')],['Désignation du type',v('modele')],['N° de série',v('sn')]],4);close();
+  open(nn(),'Équipement de mesure utilisé');{const used=EQ.filter(e=>sel.has(e.id));
+    if(!used.length){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(150);doc.text('Aucun appareil sélectionné',IX,y+4);y+=7}
+    used.forEach((e,i)=>{pageCheck(11);if(i){doc.setDrawColor(...LINE);doc.line(IX,y,IX+IW,y)}
+      doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(...FG);doc.text(e.n,IX,y+4.6);
+      doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(...MUTED);doc.text(`Sn° ${e.s}  ·  cert. n° ${e.c}`,IX,y+8.6);
+      if(e.e){const s=status(e);pill(s.txt,s.k,IX+IW,y+3)}y+=11})}
+  close();
+  open(nn(),'Accessoires fournis');PRET_ACC.forEach(([id,l],k)=>qcm(l,'fo',ck(id)?'Fourni':'Non fourni',k===0));
+  if(v('pAccAutre'))qcm('Autre : '+v('pAccAutre'),'fo','Fourni',false);close();
+  open(nn(),'Preuves de contrôle fournies');PRET_PR.forEach(([id,l],k)=>qcm(l,'fo',ck(id)?'Fourni':'Non fourni',k===0));close();
+  open(nn(),'Critères de soudure',44);
+  {const emb=[...PRET_EMB.filter(([id])=>ck(id)).map(([,l])=>l),...(ck('pEmbAutreChk')?['Autre'+(v('pEmbAutre')?' : '+v('pEmbAutre'):'')]:[])].join(', ');
+    fields([["Type d'emballage",emb]],1);
+    const crit=[['T° de scellage',wu(v('pTemp'),'°C')],['Pression de scellage',wu(v('pPress'),'N')],...(type==='impul'?[['ts – temps de soudure',wu(v('pTs'),'s')],['tc – temps de refroidissement',wu(v('pTc'),'s')]]:[['Vitesse de scellage',wu(v('pVit'),'m/min')]])];
+    fields(crit,crit.length);qcm('Intégrité de la soudure','ok',choices['pret|integ'],false)}
+  close();
+  open(nn(),'SAV / remarques');doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+  {const ls=doc.splitTextToSize(v('pSav')||'—',IW-4),bh=ls.length*4.6+3.6;
+    if(y+bh<=BOT){doc.setDrawColor(...LINE);doc.roundedRect(IX,y,IW,bh,1.2,1.2,'S');doc.setTextColor(...FG);doc.text(ls,IX+2,y+5,{lineHeightFactor:1.4});y+=bh+2}
+    else ls.forEach(l=>{pageCheck(5);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(...FG);doc.text(l,IX+2,y+3.5);y+=4.6})}
+  close();
+  open(nn(),'Conclusion',70);qcm('Conformité machine','ok',choices.conforme,true);
+  {doc.setDrawColor(...LINE);doc.line(IX,y,IX+IW,y);y+=2}
+  }
   pageCheck(44);const sw=(IW-6)/2;
-  [['Signature technicien SAV',pads[0],v('techNom')],['Signature client',pads[1],v('cliNom')]].forEach(([l,p,nom],i)=>{const x=IX+i*(sw+6);
+  [['Signature technicien SAV',pads[0],v('techNom')],['Signature client',pads[1],v('cliNom')]].slice(0,PRET?1:2).forEach(([l,p,nom],i)=>{const x=IX+i*(sw+6);
     doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...MUTED);doc.text(l,x,y+2.6);
     doc.setDrawColor(...LINE);doc.roundedRect(x,y+4,sw,25,1.2,1.2,'S');if(p.used)doc.addImage(p.c.toDataURL('image/jpeg',0.92),'JPEG',x+1,y+5,sw-2,23);
     doc.roundedRect(x,y+31,sw,7,1.2,1.2,'S');doc.setFont('helvetica',nom?'bold':'normal');doc.setFontSize(9.5);doc.setTextColor(...(nom?FG:[160,166,175]));doc.text(nom||'—',x+2,y+35.8)});
@@ -972,7 +1060,7 @@ $('cLogoPos').addEventListener('change',e=>{CFG.logoPos=e.target.value;applyCfg(
 $('admExport').onclick=async()=>{if(!readAdm())return;try{localStorage.setItem('ssti_cfg',JSON.stringify(CFG))}catch(e){}applyCfg();
   const cl=document.documentElement.cloneNode(true),q=s=>cl.querySelector(s);
   q('#cfgData').textContent=JSON.stringify(CFG);
-  ['#eqList','#mgrList','#dyn','#photoList','#docList','#certNotice','#typeSel','#suiviNotice','#prevNotice','#intParts','#suiviList','#intSug'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
+  ['#eqList','#mgrList','#dyn','[data-key="pret|integ"]','#photoList','#docList','#certNotice','#typeSel','#suiviNotice','#prevNotice','#intParts','#suiviList','#intSug'].forEach(s=>{const e=q(s);if(e)e.innerHTML=''});
   cl.querySelectorAll('input').forEach(i=>{i.removeAttribute('readonly')});q('#admPanel').setAttribute('hidden','');q('#admEdit').setAttribute('hidden','');q('#admLock').removeAttribute('hidden');q('#toast').setAttribute('hidden','');q('#valModal').setAttribute('hidden','');q('#ocrSec').setAttribute('hidden','');q('#ocrOn').setAttribute('hidden','');q('#ocrOff').removeAttribute('hidden');q('#ocrThumbs').innerHTML='';q('#ocrMsg').textContent='';
   const html='<!DOCTYPE html>\n'+cl.outerHTML,name='rapport_SSTI_hors_ligne.html';
   if(downloads){try{await downloads.save({filename:name,data:html});toast('Version techniciens enregistrée')}catch(e){toast('Enregistrement annulé.')}}
@@ -1188,7 +1276,7 @@ function renderEdit(){const el=$('editNotice');if(!CUR){el.hidden=true;el.innerH
   const r=HIST.find(x=>x.id===CUR.id);el.hidden=false;
   el.innerHTML=`<div class="notice warn"><b>Modification du rapport ${esc((r&&r.ri)||riVal()||'')}</b><span>Généré le ${fmtStamp(CUR.firstAt)}. Corrigez ce qui doit l'être puis « Générer le PDF » : la version corrigée remplacera l'ancienne dans les rapports enregistrés, et le PDF portera la mention « Version modifiée ».</span></div>`;renderHist()}
 async function saveHist(){if(!VALID)return;const now=Date.now(),d=draftData(),id=(CUR&&CUR.id)||('r'+now.toString(36)),old=HIST.find(x=>x.id===id);
-  const rec={id,ri:riVal(),client:$('client').value.trim(),ville:$('cpville').value.trim(),modele:$('modele').value.trim(),sn:$('sn').value.trim(),typeNom:TYPES[type].nom,dateInt:$('date').value,
+  const rec={id,ri:riVal(),client:$('client').value.trim(),ville:$('cpville').value.trim(),modele:$('modele').value.trim(),sn:$('sn').value.trim(),typeNom:(typeof kind!=='undefined'&&kind==='pret'?'Soudeuse de prêt – ':'')+TYPES[type].nom,dateInt:$('date').value,
     firstAt:old?old.firstAt:now,updatedAt:now,versions:(old?old.versions:0)+1,validBy:VALID.nom,data:{...d,cur:null}};
   try{await idbDo('readwrite',st=>st.put(rec,id),'h');CUR={id,firstAt:rec.firstAt};await loadHist();
     const extra=HIST.slice(100);for(const x of extra)await idbDo('readwrite',st=>st.delete(x.id),'h');if(extra.length)await loadHist();
@@ -1210,6 +1298,71 @@ $('histList').addEventListener('click',async ev=>{
 /* « Nouveau rapport » : on quitte le mode modification */
 {const r4=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r4.call(this);if(armed){CUR=null;renderEdit()}}}
 loadHist();
+
+/* ===== Soudeuse de prêt : type de rapport choisi avant la machine ===== */
+let kind='int';
+const PRET_ACC=[['pAccGuide','Guide sachet'],['pAccCordon',"Cordon d'alimentation"],['pAccPedale','Pédale de commande'],['pAccRuban','Ruban encreur']];
+const PRET_PR=[['pPrEch','Échantillons sachets'],['pPrSeal','Seal check']];
+const PRET_EMB=[['pEmbBop','BOP'],['pEmbUltra','ULTRA']];
+SETS.fo=[['Fourni','c'],['Non fourni','n']];
+const isPret=()=>kind==='pret';
+riVal=function(){return isProv()?provYear()+(isPret()?'-SP':'-S')+' provisoire':$('ri').value.trim()};
+syncRi=function(){if(isProv()){$('ri').value=riVal();$('ri').readOnly=true}else $('ri').readOnly=false;$('barRi').textContent=(isPret()?'RSP n° ':'RI n° ')+(riVal()||'—')};
+$('date').addEventListener('change',()=>syncRi());$('ri').addEventListener('input',()=>syncRi());$('riProv').addEventListener('change',()=>syncRi());
+{const ac=applyCfg;applyCfg=function(){ac.apply(this,arguments);if(isPret()){$('hTitre').textContent=CFG.titrePret||CFG.titre;$('hNorme').textContent=CFG.normePret||CFG.norme}}}
+function renumber(){let n=1;document.querySelectorAll('main section').forEach(s=>{const e=s.querySelector(':scope>h2>.n');
+  if(!e||!/^\d+$/.test(e.textContent.trim())||!s.getClientRects().length)return;e.textContent=String(n++).padStart(2,'0')})}
+{const rt=renderType;renderType=function(){document.body.dataset.mtype=type;rt.apply(this,arguments);renumber()}}
+function renderInteg(){document.querySelector('[data-key="pret|integ"]').innerHTML=chipsHTML('pret|integ','ok')}
+function syncEmbAutre(){$('pEmbAutreF').hidden=!$('pEmbAutreChk').checked}
+function applyKind(){const P=isPret();document.body.dataset.kind=kind;document.body.dataset.mtype=type;
+  document.querySelectorAll('#kindSel [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
+  $('riLbl').textContent=P?'N° de rapport de prêt (RSP)':'N° de rapport (RI)';$('ri').placeholder=P?'2026-SP047':'2026-S323';
+  $('dateLbl').textContent=P?'Date de départ':"Date d'intervention";
+  $('machTitle').textContent=P?'Équipement – soudeuse de prêt':'Information machine';
+  $('modeleLbl').textContent=P?'Désignation du type':'Modèle';$('modele').placeholder=P?'HM880DCV':'HM3010DCV';
+  $('typeSelLbl').textContent=P?'Modèle de soudeuse':'Type de machine';
+  $('confLbl').textContent=P?'Conformité machine':'Appareil conforme';
+  document.querySelector('.bar-title').firstChild.textContent=P?'Rapport soudeuse de prêt':"Rapport d'intervention";
+  document.title=P?'Rapport soudeuse de prêt SSTI':"Rapport d'intervention SSTI";
+  syncEmbAutre();renderInteg();applyCfg();syncRi();renumber()}
+$('kindSel').addEventListener('click',ev=>{const b=ev.target.closest('[data-kind]');if(!b||b.dataset.kind===kind)return;
+  kind=b.dataset.kind;applyKind();scheduleDraft();toast(isPret()?'Rapport soudeuse de prêt : choisissez maintenant le modèle de soudeuse':'Rapport d\'intervention')});
+$('pEmbAutreChk').addEventListener('change',()=>{syncEmbAutre();if($('pEmbAutreChk').checked)$('pEmbAutre').focus()});
+/* Enregistrement : le type de rapport suit le rapport en cours et les rapports enregistrés */
+{const dd=draftData;draftData=function(){return{...dd(),kind}}}
+{const ad=applyDraft;applyDraft=function(d){kind=d&&d.kind==='pret'?'pret':'int';document.body.dataset.kind=kind;ad(d);applyKind()}}
+/* Le suivi des préventifs ne concerne que les rapports d'intervention */
+{const ss=saveSuivi;saveSuivi=function(){if(isPret())return;return ss.apply(this,arguments)}}
+/* Nouveau rapport / Effacer une rubrique */
+{const r5=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;r5.call(this);
+  if(armed){document.querySelectorAll('#pretBox input[type=checkbox]').forEach(c=>c.checked=false);$('pays').value='France';$('pSav').value='';applyKind()}}}
+{const cs=clearSection;clearSection=function(s){if(s.id==='pretCrit'){delete choices['pret|integ']}cs(s);
+  if(s.querySelector('[data-key="conforme"]'))renderInteg();syncEmbAutre();renderInteg()}}
+/* Validation du rapport de prêt */
+function valPret(){const miss=[],warn=[],t=TYPES[type],ck=id=>$(id).checked,tv=id=>$(id).value.trim();
+  if(!isProv()&&!tv('ri'))miss.push('N° de rapport de prêt (ou cochez « rapport provisoire »)');
+  [['client','Client'],['modele','Désignation du type'],['sn','N° de série'],['date','Date de départ']].forEach(([id,l])=>{if(!tv(id))miss.push(l)});
+  if(!choices['pret|integ'])miss.push('Intégrité de la soudure');
+  if(!choices.conforme)miss.push('Conformité machine');
+  if(!PRET_ACC.some(([id])=>ck(id))&&!tv('pAccAutre'))warn.push('Aucun accessoire coché');
+  if(!PRET_PR.some(([id])=>ck(id)))warn.push('Aucune preuve de contrôle cochée (échantillons sachets, Seal check)');
+  if(!PRET_EMB.some(([id])=>ck(id))&&!ck('pEmbAutreChk'))warn.push("Type d'emballage non coché");
+  if(ck('pEmbAutreChk')&&!tv('pEmbAutre'))warn.push('Emballage « Autre » non précisé');
+  const crit=[['pTemp','T° de scellage'],['pPress','Pression de scellage'],...(type==='impul'?[['pTs','ts'],['pTc','tc']]:[['pVit','Vitesse de scellage']])].filter(([id])=>!tv(id)).map(x=>x[1]);
+  if(crit.length)warn.push('Critères de soudure non renseignés : '+crit.join(', '));
+  if(!sel.size)warn.push('Aucun appareil de mesure sélectionné (thermocouple, dynamomètre)');
+  const exp=EQ.filter(e=>sel.has(e.id)&&status(e).k==='bad');if(exp.length)warn.push('Appareil utilisé avec certificat expiré : '+exp.map(e=>e.n).join(', '));
+  if(!pads[0].used)warn.push('Signature du technicien absente');
+  let h='';
+  if(miss.length)h+=`<div class="notice bad"><b>Informations manquantes</b><ul>${miss.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`;
+  if(warn.length)h+=`<div class="notice warn"><b>À vérifier</b><ul>${warn.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></div>`;
+  if(!h)h='<div class="notice ok"><b>Le rapport de prêt est complet.</b></div>';
+  h+=`<div class="empty">Rapport de prêt ${esc(riVal()||'sans numéro')} · ${esc(tv('client')||'client non renseigné')} · ${esc(t.nom)}</div>`;
+  $('valBody').innerHTML=h;$('valChk').checked=false;$('valGo').disabled=true;if(!$('valNom').value)$('valNom').value=$('techNom').value;
+  $('valModal').hidden=false;$('valChk').focus()}
+{const bp=$('btnPdf').onclick;$('btnPdf').onclick=function(){if(isPret())return valPret();return bp.call(this)}}
+applyKind();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
