@@ -152,6 +152,20 @@ body[data-mtype="impul"] .pv-defil,body[data-mtype="defil"] .pv-impul,body:not([
 .allok+.sec-clear{margin-left:4px}
 .sec-clear[data-armed]{color:var(--bad)}
 .oth .t{display:grid;gap:4px}.oth input{font-size:14px;padding:6px 9px}
+.prog{max-width:860px;margin:6px auto 0}
+.prog>button{width:100%;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.12);border:0;border-radius:8px;color:inherit;padding:6px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.prog .pbar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}.prog .pbar i{display:block;height:100%;width:0;background:#7ee2a8;transition:width .3s}
+.prog .pmenu{white-space:nowrap;opacity:.9}
+#navPanel{background:#fff;color:#1d2433;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);margin-top:6px;max-height:60vh;overflow:auto;padding:4px}
+#navPanel .nv{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;width:100%;text-align:left;border:0;background:none;padding:9px 8px;border-radius:7px;font:inherit;font-size:14px;cursor:pointer;color:inherit}
+#navPanel .nv:hover{background:#eef2f7}#navPanel .nv b{font-family:var(--f-mono);font-weight:500}#navPanel .nv em{font-style:normal;font-size:12px;padding:2px 8px;border-radius:10px;background:#eceff3;color:#555}
+#navPanel .nv.ok em{background:#dff5e7;color:#17663a}#navPanel .nv.part em{background:#fdecd6;color:#9a5300}
+section[data-st="ok"]>h2 .n{color:#1f8a4c;opacity:1}section[data-st="part"]>h2 .n{color:#d97706;opacity:1}
+section>h2 .n{white-space:nowrap}section[data-st="ok"]>h2 .n::after{content:" ✓"}section[data-st="part"]>h2 .n::after{content:" •"}
+main section{scroll-margin-top:110px}
+.phb{border:1px solid var(--line,#d5dbe3);background:#fff;border-radius:7px;padding:4px 7px;font-size:13px;cursor:pointer;margin-left:2px}
+.mic-b{display:inline-block;margin:6px 0 2px;border:1px solid var(--line,#d5dbe3);background:#fff;border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}.mic-b.on{background:#fde8e8;border-color:#e57373;color:#b71c1c}
+@media print{.prog,.phb,.mic-b{display:none!important}}
 .oth .keep{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}.oth .keep input{width:auto;padding:0;margin:0}
 .oth-add{padding-top:8px}
 .hist-item{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:8px}
@@ -246,6 +260,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="f int-only"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
     <div class="f pret-only"><label for="pCompteur">Compteur de pièces</label><input id="pCompteur" class="mono" inputmode="numeric" placeholder="896 839">
       <label class="prov"><input type="checkbox" id="pCompteurNA"> N/A – pas de compteur de pièces</label></div>
+    <div class="f" style="grid-column:1/-1"><button class="btn btn-line" type="button" id="qrBtn">▦ Étiquette QR de cette machine</button></div>
   </div></section>
 
   <div id="prevNotice" class="int-only" hidden></div>
@@ -1475,6 +1490,102 @@ $('autreNom').addEventListener('input',()=>{if(type!=='autre')return;$('headType
 {const dd=draftData;draftData=function(){return{...dd(),autre:AUTRE}}}
 {const ad=applyDraft;applyDraft=function(d){if(d&&d.autre&&Array.isArray(d.autre.sections)&&Array.isArray(d.autre.champs))AUTRE={sections:d.autre.sections,champs:d.autre.champs};ad(d)}}
 renderType();
+</script>
+<script>
+/* ===== Ergonomie : progression, menu des rubriques, dictée vocale, photo sur une ligne ===== */
+(()=>{
+const vis=e=>!!e.getClientRects().length;
+const SKIP=new Set(['soft','dfab','cliNom','prochaine','pAccAutre','contact']);
+function secs(){return [...document.querySelectorAll('main .sheet section')].filter(s=>{const n=s.querySelector(':scope>h2>.n');return n&&/^\d+$/.test(n.textContent.trim())&&vis(s)})}
+function secTitle(s){const h=s.querySelector(':scope>h2').cloneNode(true);h.querySelectorAll('.n,.allok,button,label').forEach(x=>x.remove());return h.textContent.replace(/\s+/g,' ').trim()}
+function status(s){
+  if(s.querySelector('#photoList,#docList'))return 'opt';
+  let tot=0,done=0;
+  const keys=new Set([...s.querySelectorAll('.chip')].filter(vis).map(b=>b.dataset.k));
+  keys.forEach(k=>{tot++;if(choices[k])done++});
+  s.querySelectorAll('input,select,textarea').forEach(e=>{
+    if(!vis(e)||e.closest('.oth,#autreEd,.allok,.mic-b')||SKIP.has(e.id))return;
+    const t=(e.type||'').toLowerCase();if(['checkbox','radio','file','hidden','button'].includes(t))return;
+    if(e.disabled&&e.id!=='ri')return;
+    tot++;if((e.value||'').trim()||(e.id==='ri'&&$('riProv')&&$('riProv').checked))done++});
+  const cbs=[...s.querySelectorAll('input[type=checkbox]')].filter(c=>vis(c)&&!c.closest('.allok,.oth,.prov')&&!['riProv','pCompteurNA'].includes(c.id));
+  if(cbs.length){tot++;if(cbs.some(c=>c.checked))done++}
+  if(!tot)return 'opt';return done>=tot?'ok':done?'part':'vide'}
+const ST={ok:'Complète',part:'À compléter',vide:'Vide',opt:'Facultative'};
+const bar=document.createElement('div');bar.className='prog';
+bar.innerHTML='<button type="button" id="progBtn" aria-expanded="false" aria-controls="navPanel"><span id="progTxt">Rubriques</span><span class="pbar"><i id="progFill"></i></span><span class="pmenu">Aller à ▾</span></button><div id="navPanel" hidden></div>';
+document.querySelector('.bar-in').after(bar);
+function update(){const L=secs();let ok=0,cnt=0;
+  L.forEach(s=>{const st=status(s);s.dataset.st=st;if(st!=='opt'){cnt++;if(st==='ok')ok++}});
+  $('progTxt').textContent=`${ok} rubrique${ok>1?'s':''} sur ${cnt} remplie${ok>1?'s':''}`;
+  $('progFill').style.width=(cnt?Math.round(ok*100/cnt):0)+'%';
+  if(!$('navPanel').hidden)fillNav()}
+function fillNav(){$('navPanel').innerHTML=secs().map((s,i)=>{const n=s.querySelector(':scope>h2>.n').textContent;
+  return `<button type="button" data-go="${i}" class="nv ${s.dataset.st||''}"><b>${n}</b><span>${esc(secTitle(s))}</span><em>${ST[s.dataset.st]||''}</em></button>`}).join('')}
+$('progBtn').addEventListener('click',()=>{const p=$('navPanel'),open=p.hidden;if(open){update();fillNav()}p.hidden=!open;$('progBtn').setAttribute('aria-expanded',String(open))});
+$('navPanel').addEventListener('click',ev=>{const b=ev.target.closest('[data-go]');if(!b)return;const s=secs()[+b.dataset.go];$('navPanel').hidden=true;$('progBtn').setAttribute('aria-expanded','false');
+  if(s){s.scrollIntoView({behavior:'smooth',block:'start'});const f=[...s.querySelectorAll('input:not([type=checkbox]),select,textarea')].find(e=>vis(e)&&!e.disabled&&!(e.value||'').trim());if(f)setTimeout(()=>f.focus({preventScroll:true}),450)}});
+document.addEventListener('click',ev=>{if(!ev.target.closest('.prog'))$('navPanel').hidden=true});
+let ut;const later=()=>{clearTimeout(ut);ut=setTimeout(()=>{update();decorate()},150)};
+['input','change','click'].forEach(e=>document.addEventListener(e,later));
+new MutationObserver(later).observe($('dyn'),{childList:true});
+setTimeout(later,300);setTimeout(later,1800);
+
+/* Photo sur une ligne de contrôle : la photo va dans « Photos », légende = rubrique – ligne */
+const camIn=document.createElement('input');camIn.type='file';camIn.accept='image/*';camIn.setAttribute('capture','environment');camIn.hidden=true;document.body.appendChild(camIn);
+let camFor=null;
+function rowLabel(r){const i=r.querySelector('[data-oth]');return i?(i.value.trim()||'Ligne ajoutée'):(r.querySelector('.t')?.textContent||'').replace(/\s+/g,' ').trim()}
+function decorate(){document.querySelectorAll('#dyn section[data-si] .row').forEach(r=>{const c=r.querySelector('.chips');if(!c)return;
+    let b=c.querySelector('.phb');if(!b){b=document.createElement('button');b.type='button';b.className='phb';b.title='Ajouter une photo pour cette ligne';c.appendChild(b)}
+    const sec=secTitle(r.closest('section')),cap=sec+' – '+rowLabel(r),n=PHOTOS.filter(p=>p.line===cap).length;
+    b.dataset.cap=cap;b.textContent=n?'📷 '+n:'📷';b.setAttribute('aria-label',(n?n+' photo(s). ':'')+'Ajouter une photo : '+rowLabel(r))})}
+document.addEventListener('click',ev=>{const b=ev.target.closest('.phb');if(!b)return;camFor=b.dataset.cap;camIn.click()});
+camIn.addEventListener('change',async()=>{const fs=[...camIn.files];camIn.value='';if(!fs.length||!camFor)return;let ok=0;
+  for(const f of fs){try{const j=await toJpeg(f,1600);PHOTOS.push({id:'p'+Date.now()+Math.random().toString(36).slice(2,6),cap:camFor,line:camFor,...j});ok++}catch(e){}}
+  renderMedia();decorate();scheduleDraft();toast(ok?`Photo ajoutée : ${camFor} (visible dans « Photos »)`:'Photo illisible par ce navigateur')});
+
+/* Dictée vocale dans les champs de commentaire */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){const mic=document.createElement('button');mic.type='button';mic.className='mic-b';mic.textContent='🎤 Dicter';mic.hidden=true;document.body.appendChild(mic);
+  let tgt=null,rec=null;
+  const ok=e=>e&&(e.tagName==='TEXTAREA'&&!e.closest('#autreEd,#admPanel')||e.tagName==='INPUT'&&e.matches('[data-othtxt],[data-cap],#defCons'));
+  document.addEventListener('focusin',ev=>{const e=ev.target;if(ok(e)){tgt=e;e.after(mic);mic.hidden=false}else if(e!==mic&&!rec){mic.hidden=true}});
+  mic.addEventListener('mousedown',ev=>ev.preventDefault());
+  mic.addEventListener('click',()=>{if(rec){rec.stop();return}if(!tgt)return;
+    rec=new SR();rec.lang='fr-FR';rec.interimResults=false;rec.continuous=false;
+    mic.textContent='● J\'écoute… (toucher pour arrêter)';mic.classList.add('on');
+    rec.onresult=e=>{const t=[...e.results].map(r=>r[0].transcript).join(' ').trim();if(!t)return;
+      const v=tgt.value;tgt.value=v+(v&&!/\s$/.test(v)?' ':'')+t.charAt(0).toUpperCase()+t.slice(1);tgt.dispatchEvent(new Event('input',{bubbles:true}))};
+    rec.onerror=e=>{toast(e.error==='not-allowed'||e.error==='service-not-allowed'?'Micro non autorisé : autorisez-le dans le navigateur':'Dictée interrompue')};
+    rec.onend=()=>{rec=null;mic.textContent='🎤 Dicter';mic.classList.remove('on');tgt&&tgt.focus()};
+    try{rec.start()}catch(e){rec=null;mic.textContent='🎤 Dicter'}});
+}
+})();
+</script>
+<script>
+/* ===== QR code machine : le lien ?sn=…&client=… pré-remplit le rapport et montre les anciens rapports ===== */
+(()=>{const P=new URLSearchParams(location.search),F=['client','contact','adresse','cpville','fab','modele','sn'];
+  if(!F.some(k=>P.get(k))&&!P.get('type'))return;
+  const go=()=>{if(!draftReady){setTimeout(go,200);return}
+    const sn=(P.get('sn')||'').trim(),cur=$('sn').value.trim(),busy=$('client').value.trim()||cur;
+    const fill=()=>{const t=P.get('type');if(t&&TYPES[t]&&t!==type){const b=document.querySelector(`#typeSel [data-type="${t}"]`);b&&b.click()}
+      F.forEach(k=>{const v=P.get(k);if(v!=null&&v.trim()&&$(k)){$(k).value=v.trim();$(k).dispatchEvent(new Event('input',{bubbles:true}))}});
+      if(typeof scheduleDraft==='function')scheduleDraft();
+      const n=sn?HIST.filter(r=>nzs(r.sn||'')===nzs(sn)).length:0;
+      if(sn){$('histQ').value=sn;renderHist();if(n)$('histDet').open=true}
+      toast(`Machine ${P.get('modele')||''} n° ${sn||'?'} : fiche remplie`+(n?` · ${n} ancien(s) rapport(s) sur cet appareil`:''))};
+    history.replaceState(null,'',location.pathname);
+    if(busy&&sn&&nzs(cur)!==nzs(sn)){
+      if(confirm(`Un rapport est déjà en cours (${$('client').value.trim()||'client ?'} – n° ${cur||'?'}).\n\nCommencer un nouveau rapport pour la machine n° ${sn} ?\n(Annuler = garder le rapport en cours)`)){
+        const r=$('btnReset');r.click();r.click();setTimeout(fill,600)}
+      else{$('histQ').value=sn;renderHist();$('histDet').open=true}}
+    else fill()};
+  go()})();
+</script>
+<script>
+/* Bouton « Étiquette QR » : ouvre le générateur avec la machine du rapport */
+$('qrBtn').addEventListener('click',()=>{const p=new URLSearchParams();['client','contact','adresse','cpville','fab','modele','sn'].forEach(k=>{const v=$(k).value.trim();if(v)p.set(k,v)});p.set('type',type);
+  window.open('qr.html?'+p.toString(),'_blank','noopener')});
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */

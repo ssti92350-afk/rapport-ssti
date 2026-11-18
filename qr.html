@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Étiquettes QR machines – SSTI</title>
+<meta name="theme-color" content="#1f4e79">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--accent:#1f4e79;--line:#d5dbe3;--muted:#5b6575;--bg:#eef1f5;--f-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:#1d2433}
+.bar{position:sticky;top:0;z-index:5;background:var(--accent);color:#fff;padding:10px 14px}
+.bar-in{max-width:900px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar b{flex:1;font-weight:600;font-size:15px}
+.bar a{color:#fff;font-size:13px}
+main{max-width:900px;margin:0 auto;padding:14px}
+section{background:#fff;border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}
+section h2{margin:0;padding:10px 14px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;background:#e6edf5;color:var(--accent)}
+.body{padding:14px;display:grid;gap:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}
+input,select,textarea{width:100%;font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+textarea{min-height:90px}
+.btn{font:inherit;font-size:14px;padding:9px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+.btn.line{background:#fff;color:var(--accent)}
+.btn.small{padding:5px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.list{display:grid;gap:8px}
+.item{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}
+.item svg{width:64px;height:64px}
+.item b{display:block}.item span{font-size:13px;color:var(--muted)}
+.item .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.item input.cp{width:62px;padding:5px 7px}
+.empty{color:var(--muted);font-size:14px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1d2433;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:90vw}
+/* Planche d'impression */
+#sheet{display:none}
+@media print{
+  @page{size:A4;margin:8mm}
+  body{background:#fff}
+  .bar,main,#toast{display:none!important}
+  #sheet{display:flex;flex-wrap:wrap;gap:3mm;align-content:flex-start}
+  .lab{border:0.2mm dashed #999;display:flex;align-items:center;gap:2.5mm;padding:2mm;break-inside:avoid;overflow:hidden;color:#000;font-family:Arial,Helvetica,sans-serif}
+  .lab.rect{width:62mm;height:32mm}
+  .lab.rect svg{width:27mm;height:27mm;flex:none}
+  .lab.round{width:44mm;height:44mm;border-radius:50%;flex-direction:column;justify-content:center;gap:0.6mm;padding:3mm;text-align:center}
+  .lab.round svg{width:25mm;height:25mm}
+  .lab .tx{display:flex;flex-direction:column;gap:0.6mm;min-width:0;font-size:7.5pt;line-height:1.15}
+  .lab .tx b{font-size:10pt;letter-spacing:.06em}
+  .lab .tx .sn{font-family:var(--f-mono);font-weight:700;font-size:8.5pt}
+  .lab .tx .cl{font-weight:700}
+  .lab .tx .sc{font-size:6.5pt;color:#333}
+  .lab.round .tx{align-items:center;font-size:6.5pt}
+  .lab.round .tx b,.lab.round .tx .sc,.lab.round .tx .cl{display:none}
+}
+</style>
+</head>
+<body>
+<div class="bar"><div class="bar-in"><b>Étiquettes QR des machines</b><a href="./">← Retour au rapport</a></div></div>
+<main>
+  <section><h2>Nouvelle machine</h2><div class="body">
+    <p class="hint">Le QR code contient un lien vers le rapport : en le scannant avec l'appareil photo du téléphone, le rapport s'ouvre déjà rempli avec le client, le modèle et le n° de série, et les anciens rapports de la machine (enregistrés sur ce téléphone) s'affichent.</p>
+    <div class="grid">
+      <div><label for="client">Client *</label><input id="client" placeholder="CH VIERZON"></div>
+      <div><label for="contact">Contact</label><input id="contact" placeholder="M. …"></div>
+      <div><label for="adresse">Adresse</label><input id="adresse"></div>
+      <div><label for="cpville">Code postal / Ville</label><input id="cpville" placeholder="18100 VIERZON"></div>
+      <div><label for="fab">Fabricant</label><input id="fab" value="HAWO"></div>
+      <div><label for="modele">Modèle *</label><input id="modele" placeholder="HM3010DCV"></div>
+      <div><label for="sn">N° de série *</label><input id="sn" class="mono" placeholder="438780"></div>
+      <div><label for="type">Type de machine</label><select id="type"><option value="defil">Thermosoudeuse à défilement</option><option value="impul">Thermosoudeuse impulsion</option><option value="autre">Autre type de soudeuse</option></select></div>
+    </div>
+    <div class="row"><button class="btn" id="add" type="button">Ajouter l'étiquette</button></div>
+  </div></section>
+
+  <section><h2>Ajouter plusieurs machines d'un coup</h2><div class="body">
+    <p class="hint">Une machine par ligne : <b>Client ; Modèle ; N° de série</b> (et si besoin ; Ville ; Type : défilement, impulsion ou autre). Vous pouvez copier les colonnes depuis Excel.</p>
+    <textarea id="bulk" placeholder="CH VIERZON ; HM3010DCV ; 438780&#10;CLINIQUE DU PARC ; HM660ASV ; 512233 ; LYON ; impulsion"></textarea>
+    <div class="row"><button class="btn line" id="addBulk" type="button">Ajouter ces machines</button></div>
+  </div></section>
+
+  <section><h2>Étiquettes <span id="count"></span></h2><div class="body">
+    <div class="grid">
+      <div><label for="fmt">Format à imprimer</label><select id="fmt"><option value="rect">Étiquette rectangulaire 62 × 32 mm</option><option value="round">Pastille ronde 44 mm</option></select></div>
+      <div><label for="q">Rechercher</label><input id="q" type="search" placeholder="Client, modèle, n° de série…"></div>
+    </div>
+    <div id="list" class="list"></div>
+    <p id="empty" class="empty">Aucune étiquette pour l'instant.</p>
+    <div class="row"><button class="btn" id="print" type="button">Imprimer les étiquettes</button><button class="btn line" id="clear" type="button">Tout effacer</button></div>
+    <p class="hint">Impression sur une feuille A4 (pointillés pour la découpe) ou sur une planche d'étiquettes autocollantes. Pour qu'elles résistent au nettoyage, utilisez des étiquettes plastifiées ou recouvrez-les d'un ruban adhésif transparent. Le « nombre » à côté de chaque étiquette permet d'en imprimer plusieurs exemplaires.</p>
+  </div></section>
+</main>
+<div id="sheet"></div>
+<div id="toast" hidden></div>
+<script src="qrlib.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,3000)}
+const K='ssti_qr';
+let L=(()=>{try{const v=JSON.parse(localStorage.getItem(K));if(Array.isArray(v))return v}catch(e){}return[]})();
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(L))}catch(e){toast('Mémoire de l\'appareil pleine')}};
+const BASE=new URL('./',location.href).href;
+const TYPES={defil:'Défilement',impul:'Impulsion',autre:'Autre'};
+function link(m){const p=new URLSearchParams();['client','contact','adresse','cpville','fab','modele','sn','type'].forEach(k=>{if(m[k])p.set(k,m[k])});return BASE+'?'+p.toString()}
+function svg(text){const q=new QRCodeLib(-1,QRErrorCorrectLevel.M);q.addData(text);q.make();const n=q.getModuleCount(),b=2;let d='';
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+b},${r+b}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n+2*b} ${n+2*b}" shape-rendering="crispEdges" role="img" aria-label="QR code"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
+function typeOf(s){s=(s||'').toLowerCase();return /imp/.test(s)?'impul':/aut/.test(s)?'autre':'defil'}
+function add(m){m.sn=(m.sn||'').trim();m.client=(m.client||'').trim();m.modele=(m.modele||'').trim();
+  if(!m.client||!m.modele||!m.sn)return 'incomplet';
+  const i=L.findIndex(x=>x.sn.toUpperCase()===m.sn.toUpperCase()&&x.modele.toUpperCase()===m.modele.toUpperCase());
+  const e={id:i>=0?L[i].id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),copies:i>=0?L[i].copies:1,...m};
+  if(i>=0){L[i]=e;return 'maj'}L.unshift(e);return 'ok'}
+function render(){const q=($('q').value||'').trim().toUpperCase(),v=q?L.filter(m=>[m.client,m.modele,m.sn,m.cpville].join(' ').toUpperCase().includes(q)):L;
+  $('count').textContent=L.length?`(${L.length})`:'';$('empty').hidden=L.length>0;
+  $('list').innerHTML=v.map(m=>`<div class="item">${svg(link(m))}<div><b>${esc(m.client)}</b><span>${esc(m.fab||'')} ${esc(m.modele)} · n° ${esc(m.sn)} · ${TYPES[m.type]||''}${m.cpville?' · '+esc(m.cpville):''}</span></div>
+    <div class="acts"><label style="margin:0">Nombre <input class="cp" type="number" min="0" max="50" value="${m.copies??1}" data-cp="${m.id}"></label>
+    <a class="btn line small" href="${esc(link(m))}" target="_blank" rel="noopener">Tester</a><button class="btn line small" type="button" data-del="${m.id}">Supprimer</button></div></div>`).join('')}
+$('add').onclick=()=>{const m={};['client','contact','adresse','cpville','fab','modele','sn','type'].forEach(k=>m[k]=$(k).value.trim());
+  const r=add(m);if(r==='incomplet'){toast('Client, modèle et n° de série sont obligatoires');return}
+  save();render();toast(r==='maj'?'Étiquette mise à jour (même machine)':'Étiquette ajoutée');['contact','adresse','sn'].forEach(k=>$(k).value='');$('sn').focus()};
+$('addBulk').onclick=()=>{let ok=0,bad=0;$('bulk').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const c=l.split(/\s*[;\t]\s*/);const r=add({client:c[0],modele:c[1],sn:c[2],cpville:c[3]||'',type:typeOf(c[4]),fab:'HAWO'});if(r==='incomplet')bad++;else ok++});
+  save();render();if(ok)$('bulk').value='';toast(`${ok} machine(s) ajoutée(s)`+(bad?` · ${bad} ligne(s) incomplète(s) ignorée(s)`:''))};
+$('list').addEventListener('click',ev=>{const b=ev.target.closest('[data-del]');if(!b)return;
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='Confirmer';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Supprimer'}},4000);return}
+  L=L.filter(m=>m.id!==b.dataset.del);save();render()});
+$('list').addEventListener('input',ev=>{const id=ev.target.dataset.cp;if(!id)return;const m=L.find(x=>x.id===id);if(m){m.copies=Math.max(0,Math.min(50,parseInt(ev.target.value)||0));save()}});
+$('q').addEventListener('input',render);
+$('clear').onclick=function(){if(!L.length)return;if(!this.dataset.armed){this.dataset.armed=1;this.textContent='Confirmer : tout effacer';setTimeout(()=>{delete this.dataset.armed;this.textContent='Tout effacer'},4000);return}
+  L=[];save();render();delete this.dataset.armed;this.textContent='Tout effacer'};
+$('print').onclick=()=>{const f=$('fmt').value,items=L.flatMap(m=>Array(m.copies??1).fill(m));if(!items.length){toast('Aucune étiquette à imprimer');return}
+  $('sheet').innerHTML=items.map(m=>`<div class="lab ${f}">${svg(link(m))}<div class="tx"><b>SSTI</b><span class="cl">${esc(m.client)}</span><span>${esc(m.modele)}</span><span class="sn">SN ${esc(m.sn)}</span><span class="sc">Scanner pour le rapport</span></div></div>`).join('');
+  setTimeout(()=>window.print(),50)};
+/* Pré-remplissage depuis le rapport (bouton « Étiquette QR ») */
+{const p=new URLSearchParams(location.search);['client','contact','adresse','cpville','fab','modele','sn','type'].forEach(k=>{const v=p.get(k);if(v&&$(k))$(k).value=v});if(p.get('sn'))history.replaceState(null,'',location.pathname)}
+render();
+</script>
+</body>
+</html>
