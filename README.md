@@ -1,6 +1,6 @@
 # Rapport d'intervention SSTI
 
-Formulaire de rapport d'intervention – requalification opérationnelle des thermosoudeuses (selon NF EN ISO 11607).
+Formulaire de rapport d'intervention – requalification opérationnelle des thermosoudeuses (selon NF EN 11607).
 Fonctionne sur téléphone, tablette et ordinateur, **même sans connexion internet**.
 
 **Lien de l'application :** https://ssti92350-afk.github.io/rapport-ssti/
@@ -17,6 +17,7 @@ Fonctionne sur téléphone, tablette et ordinateur, **même sans connexion inter
 
 - **Type de rapport choisi en premier** : *Rapport d'intervention* ou *Soudeuse de prêt*, puis le type de machine.
 - Deux types de machine : **thermosoudeuse à défilement** (ex. HM3010DCV) et **thermosoudeuse impulsion** (ex. HM660ASV) ; les cases s'adaptent au type choisi.
+- **Autre type de soudeuse** : rubriques, points de contrôle (Contrôlé / Remplacé / N/A ou Oui / Non) et mesures modifiables selon la machine, avec le nom du type de soudeuse ; enregistrables comme **modèles** sur l'appareil pour les réutiliser.
 - **Rapport soudeuse de prêt** (modèle « SSTI RSP v1.0 », selon NF EN 11607-2) : n° RSP (ex. 2026-SP047, ou « AAAA-SP provisoire »), date de départ, client avec pays, équipement, appareils de mesure, accessoires fournis (guide sachet, cordon, pédale, ruban encreur), preuves de contrôle (échantillons sachets, Seal check), type d'emballage (BOP, ULTRA, autre), critères de soudure (T°, pression, vitesse en défilement ou ts / tc en impulsion, intégrité de la soudure), SAV / remarques, conformité machine et signature du technicien. Titre, ligne norme et référence qualité réglables dans l'administration.
 - Points de contrôle en boutons : Contrôlé / Remplacé / N/A, ou Oui / Non. SEALCHECK peut être barré quand l'emballage ne permet pas le test.
 - **Appareils de mesure** enregistrés sur l'appareil, à cocher selon ceux utilisés, avec **alerte d'échéance de certificat** dès 1 mois avant et alerte rouge une fois expiré.

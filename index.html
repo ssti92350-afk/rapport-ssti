@@ -110,7 +110,10 @@ canvas{width:100%;height:120px;background:var(--paper);border:1px dashed var(--m
 .bar-title small{overflow-wrap:anywhere}
 /* Soudeuse de prêt : champs propres à chaque type de rapport et de machine */
 body[data-kind="pret"] .int-only,body:not([data-kind="pret"]) .pret-only{display:none!important}
-body[data-mtype="impul"] .pv-defil,body:not([data-mtype="impul"]) .pv-impul{display:none!important}
+body[data-mtype="impul"] .pv-defil,body[data-mtype="defil"] .pv-impul,body:not([data-mtype="autre"]) .autre-only{display:none!important}
+.ae-sec{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px}
+.ae-sec textarea{font-size:14px}
+.ae-h{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.ae-h .f{flex:1;min-width:180px}
 .kindsel .typecard b{font-size:15px}
 .checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px}
 .checks .eq{border-bottom:1px solid var(--line)}
@@ -180,7 +183,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <img id="hLogo" alt="Logo" hidden>
     <h1 id="hTitre">RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE</h1>
     <div class="type" id="headType">THERMOSOUDEUSE À DÉFILEMENT</div>
-    <div class="norm" id="hNorme">Selon NF EN ISO 11607</div>
+    <div class="norm" id="hNorme">Selon NF EN 11607</div>
   </div>
 
   <div id="certNotice"></div>
@@ -217,6 +220,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     </div>
     <div class="lbl" id="typeSelLbl">Type de machine</div>
     <div class="typesel" id="typeSel"></div>
+    <div class="f autre-only"><label for="autreNom">Type de soudeuse (préciser)</label><input id="autreNom" placeholder="Ex. soudeuse rotative, soudeuse à cloche, soudeuse sous vide…"></div>
     <div class="grid">
       <div class="f"><label for="ri" id="riLbl">N° de rapport (RI)</label><input id="ri" class="mono" placeholder="2026-S323">
         <label class="prov"><input type="checkbox" id="riProv"> Numéro pas encore attribué : rapport provisoire</label></div>
@@ -395,6 +399,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
         <div class="f"><label for="cDocVer_impul">Version / indice</label><input id="cDocVer_impul" class="mono" placeholder="2"></div>
         <div class="f"><label for="cDocDate_impul">Date d'application</label><input id="cDocDate_impul" type="date"></div>
       </div>
+      <div class="lbl">Autre type de soudeuse</div>
+      <div class="grid">
+        <div class="f"><label for="cDocRef_autre">Référence du document</label><input id="cDocRef_autre" class="mono"></div>
+        <div class="f"><label for="cDocVer_autre">Version / indice</label><input id="cDocVer_autre" class="mono"></div>
+        <div class="f"><label for="cDocDate_autre">Date d'application</label><input id="cDocDate_autre" type="date"></div>
+      </div>
       <div class="lbl">Soudeuse de prêt</div>
       <div class="grid">
         <div class="f"><label for="cDocRef_pret">Référence du document</label><input id="cDocRef_pret" class="mono" placeholder="SSTI RSP"></div>
@@ -430,7 +440,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <button class="btn btn-main-in" type="button" id="valGo" disabled>Valider et générer le PDF</button>
   </div>
 </div></div>
-<script type="application/json" id="cfgData">{"titre": "RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE", "norme": "Selon NF EN ISO 11607", "societe": "SSTI", "adresse": "6 rue des Mariniers 94290 VILLENEUVE LE ROI", "tel": "09 73 28 37 52", "email": "secretariat@ssti-tm.com", "hash": "433bc52d169368d6be8a177634145c50028206dc1dd72de90397cb4a6701e4df"}</script>
+<script type="application/json" id="cfgData">{"titre": "RAPPORT D'INTERVENTION – REQUALIFICATION OPÉRATIONNELLE", "norme": "Selon NF EN 11607", "societe": "SSTI", "adresse": "6 rue des Mariniers 94290 VILLENEUVE LE ROI", "tel": "09 73 28 37 52", "email": "secretariat@ssti-tm.com", "hash": "433bc52d169368d6be8a177634145c50028206dc1dd72de90397cb4a6701e4df"}</script>
 
 <script>
 /* MiniPDF : générateur PDF autonome (aucune connexion requise).
@@ -547,6 +557,8 @@ const $=id=>document.getElementById(id);
 const CONFIG_DEFAUT=JSON.parse(document.getElementById('cfgData').textContent);
 const CFG_PRET={titrePret:'RAPPORT SOUDEUSE DE PRÊT – REQUALIFICATION OPÉRATIONNELLE',normePret:'Selon NF EN 11607-2',docRef_pret:'SSTI RSP',docVer_pret:'1.0'};
 let CFG=(()=>{try{const v=JSON.parse(localStorage.getItem('ssti_cfg'));if(v&&v.hash)return {...CFG_PRET,...CONFIG_DEFAUT,...v}}catch(e){}return {...CFG_PRET,...CONFIG_DEFAUT}})();
+/* Norme sans « ISO » (demande du 18/11/2026), y compris dans les réglages déjà enregistrés sur l'appareil */
+['norme','normePret'].forEach(k=>{if(typeof CFG[k]==='string')CFG[k]=CFG[k].replace(/NF EN ISO 11607/g,'NF EN 11607')});
 function sha256(str){const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
   const b=new TextEncoder().encode(str),l=b.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);m.set(b);m[l]=0x80;const dv=new DataView(m.buffer);dv.setUint32(n-4,l*8);dv.setUint32(n-8,Math.floor(l/0x20000000));
   let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];const w=new Uint32Array(64),r=(x,k)=>x>>>k|x<<(32-k);
@@ -563,9 +575,13 @@ function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=fals
 function docLine(){const g=k=>String(CFG[k+'_'+(typeof kind!=='undefined'&&kind==='pret'?'pret':type)]||'').trim(),r=g('docRef'),v=g('docVer'),d=g('docDate')?fmtD(g('docDate')):'';
   const ver=v?('Version '+v.replace(/^v(ersion)?\s*/i,'')+(d?' du '+d:'')):(d?'Applicable le '+d:'');return [r?'Réf. '+r:'',ver].filter(Boolean).join(' – ')}
 function footerLine(){return `${CFG.societe} – ${CFG.adresse} – Tél : ${CFG.tel} – ${CFG.email}`}
-const CF={cTitre:'titre',cNorme:'norme',cTitrePret:'titrePret',cNormePret:'normePret',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocPos:'docPos'};['defil','impul','pret'].forEach(t=>['DocRef','DocVer','DocDate'].forEach(k=>CF['c'+k+'_'+t]=k[0].toLowerCase()+k.slice(1)+'_'+t));
+const CF={cTitre:'titre',cNorme:'norme',cTitrePret:'titrePret',cNormePret:'normePret',cSociete:'societe',cAdresse:'adresse',cTel:'tel',cEmail:'email',cDocPos:'docPos'};['defil','impul','autre','pret'].forEach(t=>['DocRef','DocVer','DocDate'].forEach(k=>CF['c'+k+'_'+t]=k[0].toLowerCase()+k.slice(1)+'_'+t));
 let admTries=0,admUntil=0;
 const SETS={chk:[['Contrôlé','c'],['Remplacé','r'],['N/A','n']],yn:[['Oui','c'],['Non','k']],ok:[['Conforme','c'],['Non conforme','k']]};
+/* « Autre type de soudeuse » : rubriques et mesures modifiables selon la machine */
+let AUTRE={sections:[["Contrôles d'intégrité / remplacement",'chk',['Inspection visuelle','Nettoyage interne de la machine']],
+   ['Contrôles','yn',['Vérification température','Vérification de la pression','Contrôle visuel intégrité soudure']]],
+  champs:[["Type d'emballage",'',''],['T° consigne (°C)','','°C'],['T° mesurée (°C)','','°C'],['Pression de scellage (N)','','N']]};
 const TYPES={
  defil:{nom:'Thermosoudeuse à défilement',ex:'ex. HM3010DCV',titre:'THERMOSOUDEUSE À DÉFILEMENT',
   sections:[
@@ -577,7 +593,9 @@ const TYPES={
   sections:[
    ['Contrôle qualité / interventions','chk',['Inspection visuelle','Mise en route, contrôle autotest','Contrôle du clavier','Nettoyage interne de la soudeuse','Téflons mâchoire supérieure','Téflons mâchoire inférieure','Ruban de chauffe supérieur','Ruban de chauffe inférieur','Contrôle et calibration T° ambiante','Contrôle pression de scellage','Contrôle du système de coupe']],
    ['Réglage et contrôle final','yn',['Synchronisation électrique (système zéro)','Contrôle visuel intégrité soudure']]],
-  champs:[["Type d'emballage",'ULTRA',''],['TS consigne (°C, ±3 °C)','145','°C'],['TS mesurée (°C)','','°C'],['ts – temps de soudure (s)','2','s'],['tc – temps de refroidissement (s)','3','s'],['T° ambiante (°C)','','°C',true],['Pression de scellage (N)','','N']]}
+  champs:[["Type d'emballage",'ULTRA',''],['TS consigne (°C, ±3 °C)','145','°C'],['TS mesurée (°C)','','°C'],['ts – temps de soudure (s)','2','s'],['tc – temps de refroidissement (s)','3','s'],['T° ambiante (°C)','','°C',true],['Pression de scellage (N)','','N']]},
+ autre:{get nom(){const e=document.getElementById('autreNom');return (e&&e.value.trim())||'Autre type de soudeuse'},ex:'Rubriques modifiables selon la machine',
+  get titre(){return this.nom.toUpperCase()},get sections(){return AUTRE.sections},get champs(){return AUTRE.champs}}
 };
 const DEF_EQ=[
  {id:'e1',n:'Thermomètre RS 1316',s:'160203433',c:'2604132601',e:''},
@@ -874,7 +892,7 @@ function buildPdf(){
   open(nn(),'Critères de soudure',44);
   {const emb=[...PRET_EMB.filter(([id])=>ck(id)).map(([,l])=>l),...(ck('pEmbAutreChk')?['Autre'+(v('pEmbAutre')?' : '+v('pEmbAutre'):'')]:[])].join(', ');
     fields([["Type d'emballage",emb]],1);
-    const crit=[['T° de scellage',wu(v('pTemp'),'°C')],['Pression de scellage',wu(v('pPress'),'N')],...(type==='impul'?[['ts – temps de soudure',wu(v('pTs'),'s')],['tc – temps de refroidissement',wu(v('pTc'),'s')]]:[['Vitesse de scellage',wu(v('pVit'),'m/min')]])];
+    const crit=[['T° de scellage',wu(v('pTemp'),'°C')],['Pression de scellage',wu(v('pPress'),'N')],...(type==='impul'?[['ts – temps de soudure',wu(v('pTs'),'s')],['tc – temps de refroidissement',wu(v('pTc'),'s')]]:type==='defil'?[['Vitesse de scellage',wu(v('pVit'),'m/min')]]:[['Vitesse de scellage',wu(v('pVit'),'m/min')],['ts – temps de soudure',wu(v('pTs'),'s')],['tc – temps de refroidissement',wu(v('pTc'),'s')]].filter(x=>x[1]))];
     fields(crit,crit.length);qcm('Intégrité de la soudure','ok',choices['pret|integ'],false)}
   close();
   open(nn(),'SAV / remarques');doc.setFont('helvetica','normal');doc.setFontSize(9.5);
@@ -1349,7 +1367,7 @@ function valPret(){const miss=[],warn=[],t=TYPES[type],ck=id=>$(id).checked,tv=i
   if(!PRET_PR.some(([id])=>ck(id)))warn.push('Aucune preuve de contrôle cochée (échantillons sachets, Seal check)');
   if(!PRET_EMB.some(([id])=>ck(id))&&!ck('pEmbAutreChk'))warn.push("Type d'emballage non coché");
   if(ck('pEmbAutreChk')&&!tv('pEmbAutre'))warn.push('Emballage « Autre » non précisé');
-  const crit=[['pTemp','T° de scellage'],['pPress','Pression de scellage'],...(type==='impul'?[['pTs','ts'],['pTc','tc']]:[['pVit','Vitesse de scellage']])].filter(([id])=>!tv(id)).map(x=>x[1]);
+  const crit=[['pTemp','T° de scellage'],['pPress','Pression de scellage'],...(type==='impul'?[['pTs','ts'],['pTc','tc']]:type==='defil'?[['pVit','Vitesse de scellage']]:[])].filter(([id])=>!tv(id)).map(x=>x[1]);
   if(crit.length)warn.push('Critères de soudure non renseignés : '+crit.join(', '));
   if(!sel.size)warn.push('Aucun appareil de mesure sélectionné (thermocouple, dynamomètre)');
   const exp=EQ.filter(e=>sel.has(e.id)&&status(e).k==='bad');if(exp.length)warn.push('Appareil utilisé avec certificat expiré : '+exp.map(e=>e.n).join(', '));
@@ -1363,6 +1381,64 @@ function valPret(){const miss=[],warn=[],t=TYPES[type],ck=id=>$(id).checked,tv=i
   $('valModal').hidden=false;$('valChk').focus()}
 {const bp=$('btnPdf').onclick;$('btnPdf').onclick=function(){if(isPret())return valPret();return bp.call(this)}}
 applyKind();
+
+/* ===== Autre type de soudeuse : éditeur des rubriques et des mesures ===== */
+const MK='ssti_modeles_autre';
+function loadModels(){try{const v=JSON.parse(localStorage.getItem(MK));if(v&&typeof v==='object')return v}catch(e){}return {}}
+let MODELS=loadModels();
+function saveModels(){try{localStorage.setItem(MK,JSON.stringify(MODELS))}catch(e){toast('Modèle non enregistré (mémoire de l\'appareil pleine ?)')}}
+const SETNOM={chk:'Contrôlé / Remplacé / N/A',yn:'Oui / Non'};
+function aeSecHTML(sec,i){const[nom,set,items]=sec;return `<div class="ae-sec" data-aesec="${i}"><div class="ae-h">
+  <div class="f"><label for="ae_t${i}">Titre de la rubrique</label><input id="ae_t${i}" data-ae="t" value="${esc(nom)}"></div>
+  <div class="f" style="max-width:240px"><label for="ae_s${i}">Réponses</label><select id="ae_s${i}" data-ae="s">${Object.entries(SETNOM).map(([k,l])=>`<option value="${k}"${k===set?' selected':''}>${l}</option>`).join('')}</select></div>
+  <button type="button" class="btn btn-line" data-aerm="${i}">Retirer la rubrique</button></div>
+  <div class="f"><label for="ae_i${i}">Points de contrôle (un par ligne)</label><textarea id="ae_i${i}" data-ae="i" rows="${Math.max(3,items.length+1)}">${esc(items.join('\n'))}</textarea></div></div>`}
+function aeHTML(){const ms=Object.keys(MODELS).sort((a,b)=>a.localeCompare(b,'fr'));
+  return `<section id="autreEd"><h2><span class="n">✏</span>Rubriques de cette machine – modifiables</h2><div class="body">
+  <div class="empty">Adaptez les rubriques, les points de contrôle et les mesures à la machine. Cliquez sur « Appliquer » pour mettre à jour le rapport. Enregistrez-les comme modèle pour les retrouver la prochaine fois.</div>
+  ${ms.length?`<div class="ae-h"><div class="f"><label for="ae_mod">Modèles enregistrés sur cet appareil</label><select id="ae_mod">${ms.map(m=>`<option>${esc(m)}</option>`).join('')}</select></div>
+    <button type="button" class="btn btn-line" id="ae_load">Charger ce modèle</button><button type="button" class="btn btn-line" id="ae_del">Supprimer ce modèle</button></div>`:''}
+  <details id="ae_det"${AE_OPEN?' open':''}><summary>Modifier les rubriques et les mesures</summary><div class="mgr" id="ae_body">
+    <div id="ae_secs" class="mgr">${AUTRE.sections.map(aeSecHTML).join('')}</div>
+    <div><button type="button" class="btn btn-line" id="ae_add">+ Ajouter une rubrique</button></div>
+    <div class="f"><label for="ae_m">Mesures relevées, une par ligne, sous la forme « Libellé ; unité » (le type d'emballage est toujours demandé)</label>
+      <textarea id="ae_m" rows="${Math.max(4,AUTRE.champs.length+1)}" placeholder="T° consigne ; °C">${esc(AUTRE.champs.slice(1).map(c=>c[0].replace(/\s*\([^)]*\)\s*$/,'')+(c[2]?' ; '+c[2]:'')).join('\n'))}</textarea></div>
+    <div class="drop"><button type="button" class="btn btn-main-in" id="ae_apply">Appliquer au rapport</button></div>
+    <div class="ae-h"><div class="f"><label for="ae_name">Nom du modèle</label><input id="ae_name" placeholder="Ex. HAWO HD 650 rotative"></div>
+      <button type="button" class="btn btn-line" id="ae_save">Enregistrer comme modèle</button></div>
+  </div></details></div></section>`}
+let AE_OPEN=false;
+function readAE(){const secs=[...document.querySelectorAll('#ae_secs [data-aesec]')].map(d=>{const g=k=>d.querySelector(`[data-ae="${k}"]`).value;
+    return[g('t').trim()||'Rubrique',g('s'),g('i').split('\n').map(x=>x.trim()).filter(Boolean)]}).filter(x=>x[2].length);
+  const ch=[["Type d'emballage",'','']].concat($('ae_m').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const[a,u]=l.split(/\s*;\s*/);const un=(u||'').trim();
+    return[un?`${a.trim()} (${un})`:a.trim(),'',un]}));
+  return{sections:secs,champs:ch}}
+function setAutre(st){const old=AUTRE.champs.map(c=>c[0]);AUTRE={sections:st.sections.map(s=>[s[0],s[1]==='yn'?'yn':'chk',[...s[2]]]),champs:st.champs.map(c=>[c[0],c[1]||'',c[2]||''])};
+  const S=MES.autre||{emb:[newEmb('autre')]};MES.autre={emb:S.emb.map(r=>AUTRE.champs.map((c,i)=>{if(i===0)return r[0]??'';const j=old.indexOf(c[0]);return j>0?(r[j]??''):''})),com:AUTRE.champs.map(()=>null)};
+  OTHERS.autre={}}
+{const rt=renderType;renderType=function(){rt.apply(this,arguments);if(type==='autre')$('dyn').insertAdjacentHTML('afterbegin',aeHTML())}}
+$('dyn').addEventListener('toggle',ev=>{if(ev.target.id==='ae_det')AE_OPEN=ev.target.open},true);
+$('dyn').addEventListener('click',ev=>{const id=ev.target.id;
+  if(id==='ae_add'){const box=$('ae_secs'),i=box.children.length;box.insertAdjacentHTML('beforeend',aeSecHTML(['Nouvelle rubrique','chk',[]],i));$('ae_t'+i).select();return}
+  const rm=ev.target.closest('[data-aerm]');if(rm){if(!rm.dataset.armed){rm.dataset.armed=1;rm.textContent='Confirmer';setTimeout(()=>{if(rm.isConnected){delete rm.dataset.armed;rm.textContent='Retirer la rubrique'}},4000);return}
+    rm.closest('[data-aesec]').remove();return}
+  if(id==='ae_apply'){const st=readAE();if(!st.sections.length){toast('Gardez au moins une rubrique avec un point de contrôle.');return}
+    setAutre(st);AE_OPEN=true;renderType();scheduleDraft();toast('Rubriques mises à jour');return}
+  if(id==='ae_save'){const st=readAE(),n=($('ae_name').value.trim()||$('autreNom').value.trim());if(!n){toast('Donnez un nom au modèle.');$('ae_name').focus();return}
+    if(!st.sections.length){toast('Gardez au moins une rubrique avec un point de contrôle.');return}
+    MODELS[n]={nom:$('autreNom').value.trim(),...st};saveModels();setAutre(st);AE_OPEN=false;renderType();scheduleDraft();toast(`Modèle « ${n} » enregistré`);return}
+  if(id==='ae_load'){const n=$('ae_mod').value,m=MODELS[n];if(!m)return;setAutre(m);if(m.nom)$('autreNom').value=m.nom;
+    choices=Object.fromEntries(Object.entries(choices).filter(([k])=>!k.startsWith('autre|')));renderType();applyCfg();scheduleDraft();toast(`Modèle « ${n} » chargé`);return}
+  if(id==='ae_del'){const b=ev.target;if(!b.dataset.armed){b.dataset.armed=1;b.textContent='Confirmer la suppression';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Supprimer ce modèle'}},4000);return}
+    delete MODELS[$('ae_mod').value];saveModels();renderType();toast('Modèle supprimé')}});
+/* Nom du type de soudeuse : en-tête et carte mis à jour à la saisie */
+$('autreNom').addEventListener('input',()=>{if(type!=='autre')return;$('headType').textContent=TYPES.autre.titre;
+  const c=document.querySelector('#typeSel [data-type="autre"] b');if(c)c.textContent=TYPES.autre.nom});
+/* Le champ de l'éditeur n'est pas une donnée du rapport ; la structure, elle, suit le rapport */
+{const df=draftFields;draftFields=function(){return df().filter(e=>!/^ae_/.test(e.id))}}
+{const dd=draftData;draftData=function(){return{...dd(),autre:AUTRE}}}
+{const ad=applyDraft;applyDraft=function(d){if(d&&d.autre&&Array.isArray(d.autre.sections)&&Array.isArray(d.autre.champs))AUTRE={sections:d.autre.sections,champs:d.autre.champs};ad(d)}}
+renderType();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
