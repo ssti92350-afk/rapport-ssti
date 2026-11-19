@@ -195,6 +195,19 @@ main section{scroll-margin-top:110px}
 .mach-chip{font:inherit;font-size:13px;text-align:left;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;display:grid;gap:1px}
 .mach-chip b{font-family:var(--f-mono);font-size:13px}.mach-chip span{font-size:11.5px;color:var(--muted)}
 .mach-chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.serie{display:grid;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.serie-h{display:grid;gap:2px;font-size:13px}.serie-h span{color:var(--muted);font-size:12.5px}
+.serie-add{display:flex;gap:6px;flex-wrap:wrap}.serie-add input{flex:1 1 180px;min-width:0}
+.serie-l{display:flex;gap:6px;flex-wrap:wrap}.serie-l:empty{display:none}
+.sn-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 6px 4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg)}
+.sn-chip b{font-family:var(--f-mono);font-weight:600}.sn-chip small{color:var(--muted);font-size:11.5px}
+.sn-chip.cur{border-color:var(--accent);background:var(--accent-soft)}.sn-chip.done{opacity:.75}
+.sn-chip .link{padding:0 4px;font-size:14px}
+#serieGmao{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.serie-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:21;width:min(560px,calc(100% - 32px));
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--accent);box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.btn.btn-go{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.serie-bar span{flex:1 1 220px;min-width:0;font-size:14px}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -288,6 +301,14 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
     <div class="f pret-only"><label for="pCompteur">Compteur de pièces</label><input id="pCompteur" class="mono" inputmode="numeric" placeholder="896 839">
       <label class="prov"><input type="checkbox" id="pCompteurNA"> N/A – pas de compteur de pièces</label></div>
     <div class="f" style="grid-column:1/-1"><button class="btn btn-line" type="button" id="qrBtn">▦ Étiquette QR de cette machine</button></div>
+    <div class="serie int-only" id="serieBox" style="grid-column:1/-1">
+      <div class="serie-h"><b>Plusieurs machines identiques chez ce client ?</b>
+        <span>Ajoutez leurs n° de série. Remplissez et générez le rapport de la première machine, puis « Machine suivante » reprend tout le rapport (points de contrôle, pièces remplacées, consignes, appareils de mesure, signatures) : il ne reste qu'à saisir les valeurs mesurées.</span></div>
+      <div class="serie-add"><input id="serieIn" class="mono" placeholder="Autre n° de série, ex. 438781" autocomplete="off" aria-label="Autre n° de série du même modèle"><button type="button" class="btn btn-line" id="serieAdd">Ajouter</button></div>
+      <div id="serieGmao" hidden></div>
+      <div class="serie-l" id="serieList"></div>
+      <button type="button" class="btn btn-go" id="serieNext" hidden></button>
+    </div>
   </div></section>
 
   <div id="prevNotice" class="int-only" hidden></div>
@@ -1271,7 +1292,7 @@ function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,
 async function idbDo(mode,fn,store){store=store||'d';const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction(store,mode),st=tx.objectStore(store),rq=fn(st);
   tx.oncomplete=()=>{db.close();ok(rq&&rq.result)};tx.onerror=tx.onabort=()=>{db.close();ko(tx.error)}})}
 function draftFields(){return [...document.querySelectorAll('main input[id],main select[id],main textarea[id]')].filter(e=>e.type!=='file'&&
-  !e.closest('#admPanel,#eqDetails,#ocrSec,#histSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode'].includes(e.id))}
+  !e.closest('#admPanel,#eqDetails,#ocrSec,#histSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode','serieIn'].includes(e.id))}
 function draftData(){const f={};draftFields().forEach(e=>f[e.id]=e.type==='checkbox'?e.checked:e.value);
   return{v:1,savedAt:Date.now(),type,choices,sel:[...sel],MES,PHOTOS,DOCS,IPARTS,nextManual,riSaved,auto:[...AUTO],doutes:OCR_DOUTES,
     sigs:pads.map((p,i)=>p.used?(sigCache[i]||(sigCache[i]=p.c.toDataURL('image/png'))):null),OTHERS,f}}
@@ -1864,6 +1885,7 @@ window.__gmaoMachines={refresh,render,list:()=>M};
   document.querySelector('main').prepend(bar);
   const show=d=>{$('prevTxt').textContent=`Rapport précédent mis de côté sur cet appareil : ${label(d)}.`;bar.hidden=false};
   $('prevX').onclick=()=>{bar.hidden=true};
+  window.__setAside=d=>{if(draftHasContent(d)){putPrev(d);show(d)}};
   /* Un seul appui : plus de confirmation, l'ancien rapport reste récupérable */
   const old=$('btnReset').onclick;
   window.newReport=function(){const b=$('btnReset'),d=draftData(),had=draftHasContent(d);b.dataset.armed=1;old.call(b);
@@ -1880,6 +1902,74 @@ window.__gmaoMachines={refresh,render,list:()=>M};
       const q=new URLSearchParams(location.search);q.delete('nouveau');history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:''));
       if(draftHasContent(draftData())){newReport();toast('Nouveau rapport : formulaire vide')}};
     go()}
+})();
+</script>
+<script>
+/* ===== Plusieurs machines identiques chez le même client =====
+   Liste des autres n° de série ; « Machine suivante » reprend tout le rapport et ne vide que ce qui change d'une machine à l'autre :
+   n° de série, date de fabrication, compteur, valeurs mesurées, photos, documents et observations. Le n° de rapport passe au suivant. */
+(()=>{let SERIE={todo:[],done:[]};
+  const nz=x=>String(x||'').trim().toUpperCase().replace(/\s+/g,' '),nzk=x=>nz(x).replace(/ /g,'');
+  const curSn=()=>$('sn').value.trim();
+  const known=x=>[curSn(),...SERIE.todo,...SERIE.done].some(y=>nzk(y)===nzk(x));
+  function add(v){v=String(v||'').trim();if(!v)return false;if(known(v)){toast(`N° ${v} déjà dans la liste`);return false}SERIE.todo.push(v);return true}
+  function gmaoSugg(){const G=window.__gmaoMachines;if(!G)return[];const cl=nzk($('client').value),mo=nzk($('modele').value);if(!cl||!mo)return[];
+    const nzo=x=>String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
+    const out=[];G.list().forEach(m=>{if(m.pret||!m.numero_serie||nzo(m.organisation)!==nzo($('client').value)||nzk(m.modele)!==mo)return;
+      if(!known(m.numero_serie)&&!out.some(y=>nzk(y)===nzk(m.numero_serie)))out.push(m.numero_serie.trim())});return out}
+  function render(){
+    const L=$('serieList');
+    L.innerHTML=(SERIE.done.map(x=>`<span class="sn-chip done"><b>${esc(x)}</b><small>✓ fait</small></span>`).join('')+
+      (SERIE.todo.length||SERIE.done.length?`<span class="sn-chip cur"><b>${esc(curSn()||'n° ?')}</b><small>en cours</small></span>`:'')+
+      SERIE.todo.map((x,i)=>`<span class="sn-chip"><b>${esc(x)}</b><small>à faire</small><button type="button" class="link" data-srm="${i}" aria-label="Retirer le n° ${esc(x)}">✕</button></span>`).join(''));
+    const g=gmaoSugg(),G=$('serieGmao');
+    if(g.length){G.innerHTML=`<span>Même modèle chez ce client dans la GMAO :</span>${g.slice(0,12).map(x=>`<button type="button" class="btn btn-line" data-sadd="${esc(x)}">+ ${esc(x)}</button>`).join('')}${g.length>1?`<button type="button" class="link" data-saddall>Tout ajouter (${g.length})</button>`:''}`;G.hidden=false}
+    else{G.hidden=true;G.innerHTML=''}
+    const n=$('serieNext');if(SERIE.todo.length){n.hidden=false;n.textContent=`Machine suivante : n° ${SERIE.todo[0]} →`}else{n.hidden=true;delete n.dataset.armed}
+    const tot=SERIE.done.length+1+SERIE.todo.length;$('serieBox').querySelector('.serie-h b').textContent=tot>1?`Série de ${tot} machines identiques – machine ${SERIE.done.length+1} sur ${tot}`:'Plusieurs machines identiques chez ce client ?'}
+  function changed(){render();scheduleDraft()}
+  $('serieAdd').onclick=()=>{const i=$('serieIn');let ok=0;i.value.split(/[,;\s]+/).forEach(v=>{if(add(v))ok++});if(ok){i.value='';changed()}i.focus()};
+  $('serieIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('serieAdd').click()}});
+  $('serieBox').addEventListener('click',e=>{const r=e.target.closest('[data-srm]');if(r){SERIE.todo.splice(+r.dataset.srm,1);changed();return}
+    const a=e.target.closest('[data-sadd]');if(a){add(a.dataset.sadd);changed();return}
+    if(e.target.closest('[data-saddall]')){gmaoSugg().forEach(add);changed()}});
+  ['client','modele','sn'].forEach(id=>$(id).addEventListener('input',()=>setTimeout(render,0)));
+  new MutationObserver(()=>render()).observe($('machSug'),{childList:true});
+  /* Passer à la machine suivante */
+  function measured(){return TYPES[type].champs.map(c=>/mesur/i.test(c[0]))}
+  function nextRi(ri){const m=String(ri||'').match(/^(.*?)(\d+)(\s*)$/);if(!m)return ri;const n=String(+m[2]+1).padStart(m[2].length,'0');return m[1]+n}
+  function goNext(){const b=$('serieNext');if(!SERIE.todo.length)return;
+    if(!CUR&&!b.dataset.armed){b.dataset.armed=1;b.textContent=`Le PDF de n° ${curSn()||'?'} n'est pas encore généré – appuyez encore pour passer quand même`;
+      setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;render()}},5000);return}
+    delete b.dataset.armed;
+    const d=draftData();if(!CUR&&window.__setAside)window.__setAside(d);
+    const n=JSON.parse(JSON.stringify({...d,PHOTOS:[],DOCS:[]}));
+    const prevSn=curSn(),next=SERIE.todo[0];
+    SERIE={done:[...SERIE.done,prevSn||'n° ?'],todo:SERIE.todo.slice(1)};n.serie=SERIE;
+    Object.assign(n.f,{sn:next,dfab:'',compteur:'',pCompteur:'',intObs:''});
+    if(!n.f.riProv&&n.f.ri)n.f.ri=nextRi(n.f.ri);n.riSaved=n.f.riProv?nextRi(n.riSaved):'';
+    const M=measured(),S=n.MES&&n.MES[type];
+    if(S){S.emb=S.emb.map(v=>v.map((x,i)=>M[i]?'':x));if(S.com)S.com=S.com.map((x,i)=>M[i]?'':x)}
+    n.cur=null;n.auto=[];n.doutes=[];
+    initMes();Object.keys(TYPES).forEach(t=>OTHERS[t]={});pads.forEach(x=>x.clear());choices={};sel.clear();AUTO.clear();VALID=null;
+    applyDraft(n);$('serieBar').hidden=true;scheduleDraft();
+    const sec=$('mesBody').closest('section');sec&&sec.scrollIntoView({block:'start'});
+    const f=[...$('mesBody').querySelectorAll('input')].find(i=>!i.value&&M[+((i.id.match(/_(\d+)$/)||[])[1])]);f&&setTimeout(()=>f.focus({preventScroll:true}),100);
+    toast(`Machine n° ${next} : rapport repris, saisissez les valeurs mesurées`)}
+  $('serieNext').onclick=goNext;
+  /* Après le PDF : proposer la machine suivante */
+  const bar=document.createElement('div');bar.className='serie-bar';bar.id='serieBar';bar.hidden=true;bar.setAttribute('role','status');
+  bar.innerHTML='<span id="serieBarTxt"></span><button type="button" class="btn btn-go" id="serieBarGo">Machine suivante →</button><button type="button" class="btn btn-ghost" id="serieBarX" aria-label="Fermer">✕</button>';
+  document.body.appendChild(bar);
+  $('serieBarX').onclick=()=>{bar.hidden=true};$('serieBarGo').onclick=()=>{bar.hidden=true;goNext()};
+  {const vg=$('valGo').onclick;$('valGo').onclick=async function(){await vg.call(this);
+    if(SERIE.todo.length&&CUR){$('serieBarTxt').textContent=`Rapport de n° ${curSn()} enregistré. Reste ${SERIE.todo.length} machine${SERIE.todo.length>1?'s':''} : n° ${SERIE.todo[0]} ensuite.`;bar.hidden=false;clearTimeout(toast.h);$('toast').hidden=true}}}
+  /* Enregistrement avec le rapport en cours ; « Nouveau rapport » et « Effacer » vident la série */
+  {const dd=draftData;draftData=function(){return{...dd(),serie:SERIE}}}
+  {const ad=applyDraft;applyDraft=function(d){const v=d&&d.serie;SERIE={todo:Array.isArray(v&&v.todo)?v.todo.map(String):[],done:Array.isArray(v&&v.done)?v.done.map(String):[]};ad(d);render()}}
+  {const nr=window.newReport;window.newReport=function(){nr.apply(this,arguments);SERIE={todo:[],done:[]};bar.hidden=true;render();scheduleDraft()}}
+  {const cs=clearSection;clearSection=function(s){cs(s);if(s.contains($('serieBox'))){SERIE={todo:[],done:[]};render()}}}
+  render();
 })();
 </script>
 <script>
