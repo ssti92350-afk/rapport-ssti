@@ -189,6 +189,12 @@ main section{scroll-margin-top:110px}
 .cli-it[aria-selected="true"],.cli-it:hover{background:var(--accent-soft)}
 .cli-empty{padding:10px;font-size:13px;color:var(--muted)}
 .cli-src{font-size:11.5px;color:var(--muted)}
+.mach-sug{display:grid;gap:8px;padding:10px 12px;border:1px dashed var(--accent);border-radius:8px;background:var(--accent-soft)}
+.mach-sug .ms-h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--accent)}
+.mach-sug .ms-l{display:flex;gap:6px;flex-wrap:wrap}
+.mach-chip{font:inherit;font-size:13px;text-align:left;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;display:grid;gap:1px}
+.mach-chip b{font-family:var(--f-mono);font-size:13px}.mach-chip span{font-size:11.5px;color:var(--muted)}
+.mach-chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .link{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 4px}
 footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
 .int{border:1.5px dashed var(--warn)}.int>h2{background:var(--warn-soft);color:var(--warn)}
@@ -271,9 +277,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   </div></section>
 
   <section><h2><span class="n">03</span><span id="machTitle">Information machine</span></h2><div class="body grid">
+    <div class="mach-sug" id="machSug" style="grid-column:1/-1" hidden></div>
     <div class="f"><label for="fab">Fabricant</label><input id="fab" value="HAWO"></div>
     <div class="f"><label for="modele" id="modeleLbl">Modèle</label><input id="modele" class="mono" placeholder="HM3010DCV"></div>
-    <div class="f"><label for="sn">N° de série</label><input id="sn" class="mono" placeholder="438780"></div>
+    <div class="f"><label for="sn">N° de série</label><input id="sn" class="mono" placeholder="438780" autocomplete="off" aria-autocomplete="list" aria-controls="snList">
+      <div class="cli-list" id="snList" role="listbox" hidden></div></div>
     <div class="f int-only"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
     <div class="f int-only"><label for="dfab">Date de fabrication</label><input id="dfab" class="mono" placeholder="2009-12"></div>
     <div class="f int-only"><label for="compteur">Compteur</label><input id="compteur" class="mono" inputmode="numeric" placeholder="896 839"></div>
@@ -1775,7 +1783,71 @@ $('cliBtn').addEventListener('click',()=>{if(!list.hidden){close();return}refres
 document.addEventListener('click',e=>{if(!e.target.closest('.cli-wrap'))close()});
 addEventListener('online',()=>refresh(true));
 status();setTimeout(()=>refresh(false).then(recognize),3500);setInterval(()=>refresh(false),6e5);
-window.__gmaoClients={refresh,recognize,list:()=>C};
+window.__gmaoClients={refresh,recognize,list:()=>C,
+  /** Remplit le client (et ses coordonnées s'il est dans la GMAO) ; utilisé par les machines connues. */
+  fill(name){const c=C.find(x=>nz(x.organisation)===nz(name));if(c){pick(c);return true}setF('client',name,true);return false}};
+})();
+</script>
+<script>
+/* ===== Machines connues de la GMAO : client, modèle, n° de série et type de machine proposés =====
+   Source : fonction machines_connues() de la GMAO (bons DMA / RMA, historique des interventions, parc de prêt).
+   Liste gardée sur l'appareil, mise à jour toutes les 10 minutes quand il y a du réseau. */
+(()=>{
+const KEY='ssti_gmao_machines',box=$('machSug'),sn=$('sn'),snList=$('snList');
+const LSg=()=>{try{return JSON.parse(localStorage.getItem(KEY))||null}catch(e){return null}};
+let M=(LSg()||{}).list||[],at=(LSg()||{}).at||0,loading=false,shown=[],act=-1;
+const nz=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const pret=()=>typeof kind!=='undefined'&&kind==='pret';
+/** Modèles HAWO « …DC… » : à défilement ; autres HM… : à impulsion ; sinon type inchangé. */
+const guess=m=>{const x=String(m||'').toUpperCase().replace(/\s+/g,'');return /DC/.test(x)?'defil':/^HM\d/.test(x)?'impul':''};
+async function refresh(force){const A=window.__gmaoApi;if(!A||loading)return;if(!force&&M.length&&Date.now()-at<6e5)return;loading=true;
+  try{const t=await A.token();if(!t)return;
+    const r=await fetch(A.url+'/rest/v1/rpc/machines_connues',{method:'POST',headers:{apikey:A.key,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
+    if(!r.ok)return;const j=await r.json();if(!Array.isArray(j))return;M=j;at=Date.now();
+    try{localStorage.setItem(KEY,JSON.stringify({at,list:M}))}catch(e){}render()}
+  catch(e){}finally{loading=false}}
+/* Proposition dans « Information machine » : machines du client saisi, ou parc de prêt pour un rapport de prêt. */
+function render(){if(!M.length){box.hidden=true;return}
+  const P=pret(),cn=nz($('client').value);
+  const list=P?M.filter(m=>m.pret):(cn?M.filter(m=>!m.pret&&nz(m.organisation)===cn):[]);
+  if(!list.length){box.hidden=true;return}
+  const cur=nz(sn.value);
+  box.innerHTML=`<div class="ms-h"><b>${P?'Soudeuses du parc de prêt (GMAO)':'Machines de ce client dans la GMAO'}</b><span>Touchez une machine pour remplir le fabricant, le modèle, le n° de série et le type</span></div>
+    <div class="ms-l">${list.slice(0,24).map((m,i)=>`<button type="button" class="mach-chip" data-mi="${M.indexOf(m)}" aria-pressed="${!!m.numero_serie&&nz(m.numero_serie)===cur}"><b>${esc(m.modele||'Modèle ?')}${m.numero_serie?' · sn° '+esc(m.numero_serie):''}</b><span>${esc(P?(m.organisation?'chez '+m.organisation:'disponible'):(m.numero_serie?m.source:'modèle connu, n° de série à saisir'))}</span></button>`).join('')}</div>`;
+  box.hidden=false}
+function setF(id,v){const e=$(id);if(!e||v==null)return;e.value=String(v);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}))}
+function use(m,withClient){
+  const g=guess(m.modele);
+  if(!pret()&&g&&typeof type!=='undefined'&&type!==g&&type!=='autre'){const b=document.querySelector(`#typeSel [data-type="${g}"]`);b&&b.click()}
+  if(pret()&&g&&typeof type!=='undefined'&&type!==g){const b=document.querySelector(`#typeSel [data-type="${g}"]`);b&&b.click()}
+  setF('fab',m.fabricant||$('fab').value||'HAWO');if(m.modele)setF('modele',m.modele);if(m.numero_serie)setF('sn',m.numero_serie);
+  if(withClient&&!pret()&&m.organisation&&nz($('client').value)!==nz(m.organisation)&&window.__gmaoClients)window.__gmaoClients.fill(m.organisation);
+  render();closeSn();toast(`Machine ${m.modele||''}${m.numero_serie?' sn° '+m.numero_serie:''} reprise de la GMAO`)}
+box.addEventListener('click',e=>{const b=e.target.closest('[data-mi]');if(b)use(M[+b.dataset.mi],false)});
+/* N° de série : propositions dès 3 caractères (n° connus de la GMAO), le client suit. */
+function openSn(){const q=nz(sn.value).replace(/ /g,'');if(q.length<3||!M.length){closeSn();return}
+  shown=M.filter(m=>m.numero_serie&&m.numero_serie.replace(/\s/g,'').includes(q)&&(pret()?m.pret:true)).slice(0,12);act=-1;
+  if(!shown.length){closeSn();return}
+  snList.innerHTML=shown.map((m,i)=>`<div class="cli-it" role="option" id="sn_${i}" data-i="${i}" aria-selected="false"><b class="mono">${esc(m.numero_serie)} · ${esc(m.modele||'')}</b><span>${esc([m.pret?'Parc de prêt'+(m.organisation?' – chez '+m.organisation:''):m.organisation,m.source].filter(Boolean).join(' · '))}</span></div>`).join('');
+  snList.hidden=false}
+function closeSn(){snList.hidden=true;act=-1}
+sn.addEventListener('input',openSn);
+sn.addEventListener('keydown',e=>{if(snList.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){act=(act+(e.key==='ArrowDown'?1:-1)+shown.length)%shown.length;
+    snList.querySelectorAll('.cli-it').forEach((el,i)=>el.setAttribute('aria-selected',i===act?'true':'false'));e.preventDefault()}
+  else if(e.key==='Enter'&&act>=0){use(shown[act],true);e.preventDefault()}else if(e.key==='Escape')closeSn()});
+sn.addEventListener('blur',()=>setTimeout(()=>{closeSn();
+  /* N° de série tapé en entier et connu d'un seul client : client et modèle complétés s'ils sont vides. */
+  const q=nz(sn.value).replace(/ /g,'');if(!q)return;const hits=M.filter(m=>m.numero_serie&&m.numero_serie.replace(/\s/g,'')===q&&!m.pret);
+  if(hits.length===1&&(!$('client').value.trim()||!$('modele').value.trim())){const m=hits[0];
+    if(!$('modele').value.trim()&&m.modele)setF('modele',m.modele);if(!$('client').value.trim()&&window.__gmaoClients)window.__gmaoClients.fill(m.organisation);
+    toast(`N° de série reconnu : ${m.modele||''} chez ${m.organisation}`);render()}},150));
+snList.addEventListener('mousedown',e=>e.preventDefault());
+snList.addEventListener('click',e=>{const it=e.target.closest('.cli-it');if(it)use(shown[+it.dataset.i],true)});
+['input','change'].forEach(t=>$('client').addEventListener(t,()=>setTimeout(render,0)));
+document.addEventListener('click',e=>{if(e.target.closest('#kindSel [data-kind],#typeSel [data-type]'))setTimeout(render,0);if(!e.target.closest('#sn,#snList'))closeSn()});
+addEventListener('online',()=>refresh(true));
+render();setTimeout(()=>refresh(false),4000);setInterval(()=>refresh(false),6e5);
+window.__gmaoMachines={refresh,render,list:()=>M};
 })();
 </script>
 <script>
