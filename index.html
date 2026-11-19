@@ -1619,7 +1619,7 @@ if(SR){const mic=document.createElement('button');mic.type='button';mic.classNam
     history.replaceState(null,'',location.pathname);
     if(busy&&sn&&nzs(cur)!==nzs(sn)){
       if(confirm(`Un rapport est déjà en cours (${$('client').value.trim()||'client ?'} – n° ${cur||'?'}).\n\nCommencer un nouveau rapport pour la machine n° ${sn} ?\n(Annuler = garder le rapport en cours)`)){
-        const r=$('btnReset');r.click();r.click();setTimeout(fill,600)}
+        newReport();setTimeout(fill,600)}
       else{$('histQ').value=sn;renderHist();$('histDet').open=true}}
     else fill()};
   go()})();
@@ -1848,6 +1848,38 @@ document.addEventListener('click',e=>{if(e.target.closest('#kindSel [data-kind],
 addEventListener('online',()=>refresh(true));
 render();setTimeout(()=>refresh(false),4000);setInterval(()=>refresh(false),6e5);
 window.__gmaoMachines={refresh,render,list:()=>M};
+})();
+</script>
+<script>
+/* ===== « Nouveau rapport » en un appui : le rapport en cours est mis de côté et peut être repris =====
+   Ouvert depuis la GMAO avec ?nouveau=1 (bouton « Nouveau rapport » de la liste des rapports) : on part aussi d'un formulaire vide. */
+(()=>{const PREV='prev',LSP='ssti_brouillon_prev',NEW=new URLSearchParams(location.search).get('nouveau')==='1';
+  async function putPrev(d){try{await idbDo('readwrite',st=>st.put(d,PREV))}catch(e){try{localStorage.setItem(LSP,JSON.stringify({...d,PHOTOS:[],DOCS:[]}))}catch(e2){}}}
+  async function getPrev(){let d=null;try{d=await idbDo('readonly',st=>st.get(PREV))}catch(e){}if(!d)try{d=JSON.parse(localStorage.getItem(LSP))}catch(e){}return d}
+  async function delPrev(){try{await idbDo('readwrite',st=>st.delete(PREV))}catch(e){}try{localStorage.removeItem(LSP)}catch(e){}}
+  const label=d=>{const f=d.f||{};return [f.ri,f.client,[f.modele,f.sn&&('n° '+f.sn)].filter(Boolean).join(' ')].filter(Boolean).join(' – ')||'sans client'};
+  const bar=document.createElement('div');bar.id='prevBar';bar.className='notice warn';bar.hidden=true;bar.setAttribute('role','status');
+  bar.style.cssText='margin:12px auto;max-width:900px;display:flex;flex-wrap:wrap;align-items:center;gap:8px';
+  bar.innerHTML='<span id="prevTxt" style="flex:1 1 240px;min-width:0"></span><button type="button" class="btn btn-line" id="prevGo">Reprendre ce rapport</button><button type="button" class="btn btn-ghost" id="prevX" aria-label="Fermer">✕</button>';
+  document.querySelector('main').prepend(bar);
+  const show=d=>{$('prevTxt').textContent=`Rapport précédent mis de côté sur cet appareil : ${label(d)}.`;bar.hidden=false};
+  $('prevX').onclick=()=>{bar.hidden=true};
+  /* Un seul appui : plus de confirmation, l'ancien rapport reste récupérable */
+  const old=$('btnReset').onclick;
+  window.newReport=function(){const b=$('btnReset'),d=draftData(),had=draftHasContent(d);b.dataset.armed=1;old.call(b);
+    if(had){putPrev(d);show(d)}};
+  $('btnReset').onclick=function(){newReport()};
+  $('btnReset').title='Commence un rapport vide ; le rapport en cours est mis de côté et peut être repris';
+  $('prevGo').onclick=async()=>{const p=await getPrev();if(!p){bar.hidden=true;toast('Rapport précédent introuvable');return}
+    const cur=draftData();
+    initMes();Object.keys(TYPES).forEach(t=>OTHERS[t]={});pads.forEach(x=>x.clear());choices={};sel.clear();AUTO.clear();VALID=null;
+    applyDraft(p);
+    if(draftHasContent(cur)){await putPrev(cur);show(cur)}else{await delPrev();bar.hidden=true}
+    scheduleDraft();window.scrollTo({top:0});toast('Rapport précédent repris : '+label(p))};
+  if(NEW){const go=()=>{if(!draftReady){setTimeout(go,150);return}
+      const q=new URLSearchParams(location.search);q.delete('nouveau');history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:''));
+      if(draftHasContent(draftData())){newReport();toast('Nouveau rapport : formulaire vide')}};
+    go()}
 })();
 </script>
 <script>
