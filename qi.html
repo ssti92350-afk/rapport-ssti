@@ -1,0 +1,19 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d4f7a"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<title>Rapport d'installation (QI) — SSTI</title></head><body><p id="qiLoading" style="font-family:system-ui;padding:16px">Chargement du rapport d'installation…</p><div id="qiRoot"></div>
+<script>
+/* Reprend la charte, le logo et le générateur PDF du formulaire principal (index.html, gardé sur l'appareil hors connexion). */
+fetch('index.html').then(r=>{if(!r.ok)throw new Error();return r.text()}).then(html=>{
+  const styles=[...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
+  const cfg=/<script type="application\/json" id="cfgData">([\s\S]*?)<\/script>/.exec(html);
+  const mini=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('function MiniPDF('));
+  const ver=/VERSION_FORMULAIRE='([^']+)'/.exec(html);
+  if(!mini)throw new Error();
+  const st=document.createElement('style');st.textContent=styles;document.head.append(st);
+  window.QI_CFG=cfg?JSON.parse(cfg[1]):{};window.QI_VERSION=ver?ver[1]:'V1';
+  const s=document.createElement('script');s.textContent=mini;document.body.append(s);
+  const load=src=>new Promise((ok,ko)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=ko;document.body.append(e)});
+  return load('qi-pdf.js?v=1').then(()=>load('qi.js?v=1'));
+}).then(()=>document.getElementById('qiLoading').remove()).catch(()=>{document.getElementById('qiLoading').textContent="Le rapport d'installation est indisponible : ouvrez-le une première fois avec internet, puis rechargez la page."});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
