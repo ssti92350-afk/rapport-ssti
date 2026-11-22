@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Étalonnage chronomètre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: précis, calme, outil de paillasse
+   IDEA: tableau d'affichage horaire de laboratoire
+   PICTURE: grande horloge de référence collée en haut, tops visibles
+   COLOUR+TYPE: blanc, noir, rouge signal ; Archivo large
+   LAYOUT: une colonne, sections numérotées, actions en bas */
+:root{color-scheme:light dark;--bg:light-dark(#fff,#0e0e0e);--ink:light-dark(#111,#ececec);--mute:light-dark(#666,#9a9a9a);--line:light-dark(#dcdcdc,#2c2c2c);--card:light-dark(#f6f6f6,#171717);--red:#e4002b;--ok:light-dark(#1b7f3b,#4cc06f)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Archivo,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:clip}
+.clock{position:sticky;top:0;z-index:5;background:#111;color:#fff;padding:10px max(4vw,14px) 8px;border-bottom:4px solid var(--red)}
+.clock .row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;max-width:880px;margin:auto}
+.big{font-variation-settings:"wdth" 112;font-weight:800;font-size:clamp(40px,11vw,72px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.big small{font-size:.5em;color:#ff5c77}
+.cinfo{font-size:13px;color:#bbb;flex:1 1 200px}
+.cinfo b{color:#fff}
+.flash{animation:fl .6s}@keyframes fl{0%{background:var(--red)}100%{background:#111}}
+@media(prefers-reduced-motion:reduce){.flash{animation:none}}
+nav{position:sticky;top:var(--ch,96px);z-index:4;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:6px;overflow-x:auto;padding:8px max(4vw,14px)}
+nav a{flex:none;color:var(--ink);text-decoration:none;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:99px}
+main{max-width:880px;margin:auto;padding:0 max(4vw,14px) 80px}
+section{padding:28px 0 8px;border-bottom:1px solid var(--line);scroll-margin-top:150px}
+h2{font-variation-settings:"wdth" 112;font-weight:800;font-size:clamp(24px,5vw,32px);line-height:1.1;margin:0 0 4px}
+h2 span{color:var(--red);margin-right:.3em}
+h3{font-size:17px;margin:20px 0 8px}
+.lead{color:var(--mute);margin:0 0 16px;font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px 16px}
+label{display:block;font-size:14px;font-weight:600}
+label i{font-style:normal;font-weight:400;color:var(--mute)}
+input,select,textarea{display:block;width:100%;margin-top:4px;font:16px Archivo,system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid var(--red);outline-offset:1px}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line);font-weight:400}
+.chk input{width:24px;height:24px;min-height:0;margin:2px 0 0;flex:none;accent-color:var(--red)}
+button{font:600 15px Archivo,system-ui,sans-serif;min-height:44px;padding:10px 16px;border-radius:8px;border:1.5px solid var(--ink);background:var(--bg);color:var(--ink);cursor:pointer}
+button.pri{background:var(--red);border-color:var(--red);color:#fff}
+button.dark{background:var(--ink);color:var(--bg)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.trial{background:var(--card);border-radius:12px;padding:14px;margin:12px 0;border-left:6px solid var(--line)}
+.trial.armed{border-left-color:#ffb400}.trial.running{border-left-color:var(--red)}.trial.done{border-left-color:var(--ok)}
+.trial h4{margin:0;font-size:17px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.st{font-weight:600;font-size:14px}
+.cd{font-weight:800;font-size:clamp(28px,8vw,40px);font-variant-numeric:tabular-nums;margin:6px 0}
+.res{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:15px}
+.res b{font-variant-numeric:tabular-nums}
+.ok{color:var(--ok)}.nok{color:var(--red)}
+.note{font-size:14px;color:var(--mute)}
+.verdict{font-weight:800;font-size:22px;margin:8px 0}
+canvas.sig{width:100%;max-width:400px;aspect-ratio:5/2;border:1.5px dashed var(--line);border-radius:8px;touch-action:none;background:#fff;display:block;margin-top:4px}
+#preview{background:#fff;color:#111;border:1px solid var(--line);border-radius:8px;padding:clamp(14px,4vw,36px);margin-top:12px;font:14px/1.45 Arial,sans-serif}
+.r-title{font-size:20px;color:#1f3a5f;margin:0 0 4px}.r-sub{color:#595959;margin-top:0}
+.r-h1{font-size:16px;color:#1f3a5f;border-bottom:1.5px solid #1f3a5f;padding-bottom:2px;margin:20px 0 8px}.r-h2{font-size:14px;margin:12px 0 6px}
+.r-ind{padding-left:1.2em;text-indent:-1.2em}.r-i{font-style:italic}
+.r-tw{overflow-x:auto}.r-t{border-collapse:collapse;width:100%;margin:6px 0 10px;font-size:13px}.r-t td,.r-t th{border:1px solid #a6a6a6;padding:4px 6px;vertical-align:middle}
+.r-t th{background:#dce3ea;text-align:center}.r-k{background:#eef1f5;width:35%}.r-num td:not(:first-child){text-align:center;white-space:nowrap}
+.r-sig{display:grid;grid-template-columns:1fr 1fr;border:1px solid #a6a6a6;margin-top:10px}.r-sig>div{padding:8px;min-height:110px}.r-sig>div+div{border-left:1px solid #a6a6a6}.r-sig img{max-width:200px;height:auto}
+.r-foot{color:#7f7f7f;font-size:11px;text-align:center;margin-top:18px}
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9;max-width:90vw}
+#toast.on{opacity:1}
+#print{display:none}
+@media print{body>*:not(#print){display:none!important}#print{display:block;font:11pt/1.4 Arial,sans-serif;color:#000}@page{size:A4;margin:16mm}.r-sig{break-inside:avoid}.r-t{font-size:10pt}}
+</style>
+</head>
+<body>
+<header class="clock" id="clock">
+  <div class="row">
+    <div class="big" id="clk">--:--:--<small>.-</small></div>
+    <div class="cinfo" id="cinfo">Horloge de référence (appareil synchronisé)</div>
+  </div>
+</header>
+<nav id="nav">
+  <a href="#s1">1 Infos</a><a href="#s2">2 Préparation</a><a href="#s3">3 Essais 10 min</a><a href="#s4">4 Dérive</a><a href="#s5">5 Décision</a><a href="#s6">6 Rapport</a>
+</nav>
+<main>
+
+<section id="s1">
+  <h2><span>1</span>Document et instrument</h2>
+  <p class="lead">Ces informations sont reprises automatiquement dans le rapport. Les champs du document restent mémorisés d'un étalonnage à l'autre.</p>
+  <h3>Document</h3>
+  <div class="grid">
+    <label>Laboratoire / entreprise<input data-k="doc.labo"></label>
+    <label>Référence documentaire<input data-k="doc.ref"></label>
+    <label>Version<input data-k="doc.version"></label>
+    <label>Date d'application<input type="date" data-k="doc.dateApp"></label>
+    <label>Rédacteur <i>(nom, fonction)</i><input data-k="doc.redacteur"></label>
+    <label>Approbateur <i>(nom, fonction)</i><input data-k="doc.approbateur"></label>
+  </div>
+  <h3>Instrument et conditions</h3>
+  <div class="grid">
+    <label>N° de série / code interne<input data-k="inst.serie" list="parc" autocomplete="off"><datalist id="parc"></datalist></label>
+    <label>Marque / modèle<input data-k="inst.modele"></label>
+    <label>Résolution de l'affichage<select data-k="inst.resolution"><option>0,01 s</option><option>0,1 s</option><option>1 s</option></select></label>
+    <label>Opérateur<input data-k="inst.operateur"></label>
+    <label>Date de l'opération<input type="date" data-k="inst.date"></label>
+    <label>Température ambiante (°C) <i id="tchk">18 à 25 °C</i><input inputmode="decimal" data-k="inst.temp" placeholder="21,5"></label>
+    <label>Référence de temps utilisée<select data-k="inst.refTemps">
+      <option>Smartphone synchronisé réseau (NTP) + tops de l'application</option>
+      <option>PC synchronisé sur ntp.obspm.fr + tops de l'application</option>
+      <option>Site heurelegalefrancaise.fr (LNE-SYRTE)</option>
+      <option>Serveur NTP fr.pool.ntp.org via PC synchronisé</option></select></label>
+    <label>Décalage de l'appareil (ms, + si en avance) <i>lu sur heurelegalefrancaise.fr</i><input inputmode="decimal" data-k="offset" placeholder="0"></label>
+    <label>EMT essais 10 min (± s)<input inputmode="decimal" data-k="inst.emtCourt"></label>
+    <label>EMT dérive longue (± s)<input inputmode="decimal" data-k="inst.emtLong"></label>
+    <label>Incertitude opérateur U (± s, départ + arrêt)<input inputmode="decimal" data-k="u"></label>
+  </div>
+  <p class="note">Contrôle du décalage : ouvre <a href="https://heurelegalefrancaise.fr" target="_blank" rel="noopener">heurelegalefrancaise.fr</a> sur le même appareil. L'écart affiché est saisi ci-dessus et l'horloge du haut est corrigée.</p>
+</section>
+
+<section id="s2">
+  <h2><span>2</span>Préparation du matériel</h2>
+  <div id="prep"></div>
+</section>
+
+<section id="s3">
+  <h2><span>3</span>Essais de courte durée</h2>
+  <p class="lead">Remets le chronomètre à zéro, puis appuie sur « Programmer le top ». L'application choisit la prochaine minute pile et émet 3 bips courts puis un bip long. Démarre le chronomètre sur le bip long, puis arrête-le au bip long 10 minutes plus tard. Saisis ensuite la valeur lue, par exemple 10:00.05 ou 600,05.</p>
+  <div id="courts"></div>
+</section>
+
+<section id="s4">
+  <h2><span>4</span>Essai de dérive longue</h2>
+  <label style="max-width:280px">Durée de l'essai<select data-k="long.dureeH" id="dur"><option value="1">1 heure</option><option value="4">4 heures</option><option value="24">24 heures</option></select></label>
+  <div id="long"></div>
+  <p class="note">Pendant l'essai, garde l'application ouverte et l'écran allumé. L'application tente de bloquer la mise en veille. Si tu arrêtes le chronomètre à un autre moment, corrige T_ref avec la durée réelle.</p>
+</section>
+
+<section id="s5">
+  <h2><span>5</span>Décision et traçabilité</h2>
+  <div class="verdict" id="verdict">—</div>
+  <div class="grid">
+    <label>Statut<select data-k="decision.statut"><option value="auto">Automatique (selon les résultats)</option><option value="C">Forcer : CONFORME</option><option value="NC">Forcer : NON CONFORME</option></select></label>
+    <label>Prochain étalonnage <i>(+12 mois)</i><input type="date" data-k="decision.prochain"></label>
+  </div>
+  <label style="margin-top:12px">Observations<textarea rows="3" data-k="decision.obs"></textarea></label>
+  <div class="grid" style="margin-top:16px">
+    <div><label>Signature de l'opérateur</label><canvas class="sig" id="sigop" width="500" height="200"></canvas><button type="button" data-clear="op" style="margin-top:6px">Effacer</button></div>
+    <div><label>Responsable Métrologie / Qualité<input data-k="sig.rqNom" placeholder="Nom, prénom"></label><canvas class="sig" id="sigrq" width="500" height="200"></canvas><button type="button" data-clear="rq" style="margin-top:6px">Effacer</button></div>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span>6</span>Rapport final</h2>
+  <p class="lead">Le document final contient la procédure complète, déjà remplie avec tes saisies et les résultats calculés.</p>
+  <div class="btns">
+    <button class="pri" id="bDocx">Télécharger le rapport Word</button>
+    <button class="dark" id="bPdf">Imprimer / enregistrer en PDF</button>
+  </div>
+  <div class="btns">
+    <button id="bJson">Sauvegarder le dossier (.json)</button>
+    <button id="bOpen">Ouvrir un dossier</button><input type="file" id="fOpen" accept=".json,application/json" hidden>
+    <button id="bBlank">Procédure vierge (Word)</button>
+    <button id="bNew">Nouvel étalonnage</button>
+  </div>
+  <div id="preview"></div>
+</section>
+</main>
+<div id="print"></div>
+<div id="toast"></div>
+<script>/* Moteur de rapport : modèle commun -> .docx (zip natif) et HTML (aperçu / impression) */
+(function (G) {
+'use strict';
+const num = v => { if (v === null || v === undefined) return NaN; const s = String(v).trim().replace(',', '.'); return s === '' ? NaN : Number(s); };
+function parseTime(v) {
+  if (v === null || v === undefined) return NaN;
+  const s = String(v).trim().replace(/,/g, '.').replace(/\s/g, '');
+  if (!s) return NaN;
+  if (s.includes(':')) {
+    const p = s.split(':').map(Number);
+    if (p.some(isNaN) || p.length > 3) return NaN;
+    return p.reduce((a, b) => a * 60 + b, 0);
+  }
+  const n = Number(s); return isNaN(n) ? NaN : n;
+}
+const fr = (x, d = 2) => isFinite(x) ? x.toFixed(d).replace('.', ',') : '';
+const sg = (x, d = 2) => !isFinite(x) ? '' : (x > 0 ? '+' : x < 0 ? '−' : '') + fr(Math.abs(x), d);
+const fdate = s => { if (!s) return ''; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m ? `${m[3]}/${m[2]}/${m[1]}` : s; };
+const p2 = n => String(n).padStart(2, '0');
+const fclock = ms => { if (!ms) return ''; const d = new Date(ms); return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`; };
+const fdt = ms => { if (!ms) return ''; const d = new Date(ms); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} à ${fclock(ms)}`; };
+
+function compute(d) {
+  const U = num(d.u);
+  const row = (tref, tlu, emt) => {
+    const r = { tref: num(tref), tlu: parseTime(tlu), emt: num(emt) };
+    r.E = r.tlu - r.tref; r.tot = Math.abs(r.E) + (isFinite(U) ? U : 0);
+    r.ok = isFinite(r.E) && isFinite(r.emt) ? r.tot <= r.emt + 1e-9 : null;
+    return r;
+  };
+  const courts = d.courts.map(c => row(c.tref, c.tlu, d.inst.emtCourt));
+  const long = row(d.long.tref, d.long.tlu, d.inst.emtLong);
+  long.perDay = long.E / long.tref * 86400;
+  const all = courts.concat([long]).filter(r => r.ok !== null);
+  const auto = !all.length ? null : all.every(r => r.ok) ? 'C' : 'NC';
+  const statut = d.decision.statut === 'auto' ? auto : d.decision.statut;
+  return { U, courts, long, auto, statut };
+}
+
+/* ---------- Modèle de document ---------- */
+function model(d, blank) {
+  const B = !!blank;
+  const v = (val, ph) => B ? ph : (val !== undefined && val !== null && String(val).trim() ? String(val) : '………');
+  const R = compute(d);
+  const box = c => c ? '☒' : '☐';
+  const dur = d.long.dureeH;
+  const durTxt = { 1: '1 heure', 4: '4 heures', 24: '24 heures' }[dur] || `${dur} h`;
+  const labo = v(d.doc.labo, '[Nom du laboratoire / de l\'entreprise]');
+  const blocks = [];
+  const P = (t, o) => blocks.push(Object.assign({ type: 'p', t }, o || {}));
+  const H1 = t => blocks.push({ type: 'h1', t });
+  const H2 = t => blocks.push({ type: 'h2', t });
+  const UL = items => blocks.push({ type: 'ul', items });
+  const OL = items => items.forEach((t, i) => P([[`${i + 1}. `, { b: true }], [t]], { ind: true }));
+  const T = (widths, header, rows, o) => blocks.push(Object.assign({ type: 'table', widths, header, rows }, o || {}));
+  const KV = rows => T([3300, 6338], null, rows.map(([k, val]) => [{ t: k, b: true, fill: 'EEF1F5' }, val]));
+
+  blocks.push({ type: 'title', t: 'PROCÉDURE D\'ÉTALONNAGE INTERNE : CHRONOMÈTRE DE PAILLASSE' });
+  P(B ? 'Procédure et formulaire d\'enregistrement' : `Enregistrement d'étalonnage — ${v(d.inst.modele, '')} · n° ${v(d.inst.serie, '')}`, { sub: true });
+  KV([
+    ['Référence documentaire', v(d.doc.ref, '[PRO-MET-001]')],
+    ['Version', v(d.doc.version, '[1.0]')],
+    ['Date d\'application', B ? '[JJ/MM/AAAA]' : v(fdate(d.doc.dateApp))],
+    ['Rédacteur', v(d.doc.redacteur, '[Nom, Prénom / Fonction]')],
+    ['Approbateur', v(d.doc.approbateur, '[Nom, Prénom / Responsable Qualité]')]
+  ]);
+
+  H1('1. Objet et domaine d\'application');
+  P('Cette procédure définit les modalités de vérification et d\'étalonnage interne d\'un chronomètre de paillasse par comparaison directe à la référence nationale de temps (UTC(OP), réalisée par le LNE-SYRTE à partir d\'horloges atomiques).');
+  P(`Elle s'applique à l'ensemble des chronomètres utilisés au sein de ${labo}.`);
+
+  H1('2. Références et étalons utilisés');
+  P('En France, le temps légal et la référence nationale de temps sont réalisés par le LNE-SYRTE (Systèmes de Référence Temps-Espace), Observatoire de Paris – PSL, 61 avenue de l\'Observatoire, 75014 Paris.');
+  P('Pour réaliser cet étalonnage, utiliser l\'une des sources suivantes, raccordées au LNE-SYRTE :');
+  UL([
+    [['Option A — Serveur NTP (recommandé pour un PC) : ', { b: true }], ['ntp.obspm.fr (serveur public de l\'Observatoire de Paris). Alternative : fr.pool.ntp.org (pool public, non raccordé directement au LNE-SYRTE ; à justifier s\'il est utilisé).']],
+    [['Option B — Site officiel de l\'heure légale : ', { b: true }], ['https://heurelegalefrancaise.fr (LNE-SYRTE). Le site affiche aussi le décalage de l\'horloge de l\'appareil utilisé.']],
+    [['Option C — Application interne « Étalonnage chronomètre » : ', { b: true }], ['horloge d\'un appareil synchronisé par le réseau (NTP), avec tops sonores de départ et d\'arrêt. Le décalage de l\'appareil est contrôlé sur heurelegalefrancaise.fr avant l\'essai.']]
+  ]);
+  P('Remarque : l\'horloge parlante téléphonique (36 99) a été arrêtée le 1er juillet 2022 et ne peut plus servir de référence.', { i: true });
+
+  H1('3. Identification de l\'instrument et conditions d\'essai');
+  const t = num(d.inst.temp);
+  const tOk = isFinite(t) ? (t >= 18 && t <= 25 ? ' — dans la plage' : ' — HORS PLAGE') : '';
+  KV([
+    ['Désignation de l\'instrument', B ? 'Chronomètre de paillasse [Marque / Modèle]' : 'Chronomètre de paillasse ' + v(d.inst.modele)],
+    ['N° de série / identifiant interne', v(d.inst.serie, '[N° de série / Code interne]')],
+    ['Résolution de l\'affichage', v(d.inst.resolution, '[Ex. : 0,01 s ou 0,1 s]')],
+    ['Opérateur', v(d.inst.operateur, '[Nom, Prénom]')],
+    ['Date de l\'opération', B ? '[JJ/MM/AAAA]' : v(fdate(d.inst.date))],
+    ['Température ambiante du local', (B ? '[Ex. : 21,5 °C]' : (isFinite(t) ? fr(t, 1) + ' °C' + tOk : '………')) + ' (exigence : entre 18 °C et 25 °C)'],
+    ['Référence de temps utilisée', v(d.inst.refTemps, '[Ex. : Serveur NTP ntp.obspm.fr via PC synchronisé]') + (!B && d.offset ? ` (décalage de l'appareil contrôlé : ${d.offset} ms)` : '')],
+    ['Critère d\'acceptation (EMT)', B ? '[Ex. : ± 0,5 s sur 10 min / ± 2 s sur 24 heures]' : `Essais 10 min : ± ${v(fr(num(d.inst.emtCourt)))} s ; dérive longue (${durTxt}) : ± ${v(fr(num(d.inst.emtLong)))} s`],
+    ['Incertitude opérateur U (départ + arrêt)', B ? '[Ex. : ± 0,40 s]' : `± ${v(fr(R.U))} s`]
+  ]);
+
+  H1('4. Préparation du matériel');
+  const prepTxt = [
+    'Vérifier l\'état physique du chronomètre (lisibilité de l\'écran, propreté, bon fonctionnement des boutons Start/Stop/Reset).',
+    'Remplacer la pile si l\'indicateur de batterie faible est actif ou si l\'appareil n\'a pas été utilisé depuis plus de 6 mois.',
+    'Stabiliser le chronomètre à la température ambiante de la paillasse pendant au moins 30 minutes avant le début des mesures.',
+    'Si la référence est un ordinateur ou un téléphone, forcer la synchronisation horaire (NTP) juste avant le test et contrôler son décalage sur heurelegalefrancaise.fr (quelques millisecondes au plus).'
+  ];
+  prepTxt.forEach((x, i) => P([[box(!B && d.prep[i]) + '  ', { b: true }], [x]], { ind: true }));
+
+  H1('5. Mode opératoire de mesure');
+  H2('Étape 1 : essais de courte durée (répétabilité et déclenchement)');
+  OL([
+    'Remettre le chronomètre à zéro (00:00:00.00).',
+    'Sur un top précis de la référence (passage à la minute pile sur heurelegalefrancaise.fr ou top sonore de l\'application), déclencher simultanément le chronomètre.',
+    'Laisser le chronomètre fonctionner pendant 10 minutes (600 secondes).',
+    'Au passage exact des 10 minutes sur l\'horloge de référence, arrêter le chronomètre.',
+    'Relever la valeur affichée (T_lu) dans le tableau de résultats.',
+    'Répéter cette mesure 3 fois pour évaluer la répétabilité du déclenchement.'
+  ]);
+  if (!B) {
+    const st = d.courts.map((c, i) => c.start ? `essai ${i + 1} : ${fclock(c.start)}` : '').filter(Boolean);
+    if (st.length) P('Heures de départ enregistrées — ' + st.join(' ; ') + '.', { i: true });
+  }
+  H2('Étape 2 : essai de dérive sur longue durée');
+  OL([
+    'Remettre le chronomètre à zéro.',
+    'Déclencher le chronomètre sur un top horaire exact de la référence (T_0). Heure exacte de départ : ' + (B ? '[HH:MM:SS]' : v(fdt(d.long.start))) + '.',
+    'Laisser fonctionner le chronomètre sans interruption pendant ' + (B ? '[1 heure / 4 heures / 24 heures] (rayer les mentions inutiles)' : durTxt) + '.',
+    'À l\'instant exact correspondant à la durée théorique (T_ref) sur l\'horloge de référence, arrêter le chronomètre.',
+    'Relever la valeur affichée (T_lu).'
+  ]);
+
+  H1('6. Relevé des résultats et calcul de l\'écart');
+  P([['Erreur de justesse : ', { b: true }], ['E = T_lu − T_ref. Le point est conforme si |E| + U ≤ EMT.']]);
+  const conf = ok => ok === null ? { t: B ? '[OUI / NON]' : '—' } : { t: ok ? 'OUI' : 'NON', b: true, color: ok ? '1B7F3B' : 'C00000' };
+  const row = (lab, r, refPh) => [
+    { t: lab, b: true },
+    B ? refPh : (isFinite(r.tref) ? fr(r.tref) : '………'),
+    B ? '' : (isFinite(r.tlu) ? fr(r.tlu) : ''),
+    B ? '' : sg(r.E),
+    B ? '± …' : (isFinite(r.emt) ? '± ' + fr(r.emt) : ''),
+    B ? '' : (isFinite(r.E) ? fr(r.tot) : ''),
+    conf(B ? null : r.ok)
+  ];
+  T([1950, 1200, 1250, 1150, 1150, 1338, 1600],
+    ['Point de contrôle', 'T_ref (s)', 'T_lu (s)', 'E (s)', 'EMT (s)', '|E| + U (s)', 'Conformité'],
+    [row('Essai 1 (10 min)', R.courts[0], '600,00'), row('Essai 2 (10 min)', R.courts[1], '600,00'), row('Essai 3 (10 min)', R.courts[2], '600,00'),
+     row('Dérive longue', R.long, '[Ex. : 3600,00]')], { num: true });
+  if (!B) {
+    const Es = R.courts.map(r => r.E).filter(isFinite);
+    if (Es.length > 1) P(`Répétabilité des essais courts : étendue des écarts = ${fr(Math.max(...Es) - Math.min(...Es))} s.`);
+    if (isFinite(R.long.perDay)) P(`Dérive ramenée à 24 h : ${sg(R.long.perDay)} s/jour.`);
+  }
+  H2('Estimation de l\'incertitude liée à l\'opérateur');
+  P('En déclenchement manuel (réflexe visuel ou auditif), l\'incertitude liée à l\'opérateur est généralement estimée entre ± 0,15 s et ± 0,30 s par action, soit environ ± 0,3 s à ± 0,4 s cumulés sur un départ et un arrêt.');
+  P('Règle de décision : si l\'erreur mesurée |E| augmentée de l\'incertitude d\'essai U reste inférieure ou égale à l\'Erreur Maximale Tolérée (EMT), l\'instrument est déclaré conforme sur ce point.');
+
+  H1('7. Décision et traçabilité');
+  const s = B ? null : R.statut;
+  P([['Statut de l\'instrument :  ', { b: true }], [`${box(s === 'C')} CONFORME     ${box(s === 'NC')} NON CONFORME (mise hors service / réparation)`]]);
+  P([['Date du prochain étalonnage : ', { b: true }], [B ? '[JJ/MM/AAAA] (périodicité recommandée : 12 mois)' : v(fdate(d.decision.prochain)) + ' (périodicité : 12 mois)']]);
+  P([['Observations : ', { b: true }], [B ? '[...]' : (d.decision.obs && d.decision.obs.trim() ? d.decision.obs : 'néant')]]);
+  blocks.push({ type: 'sig', cells: [
+    { label: 'Signature de l\'opérateur', name: B ? '' : (d.inst.operateur || ''), img: B ? null : d.sig.op },
+    { label: 'Visa du Responsable Métrologie / Qualité', name: B ? '' : (d.sig.rqNom || ''), img: B ? null : d.sig.rq }
+  ] });
+  return { blocks, footer: `Réf. ${B ? '[PRO-MET-001]' : v(d.doc.ref)} — Version ${B ? '[1.0]' : v(d.doc.version)} — Page ` };
+}
+
+/* ---------- Rendu DOCX ---------- */
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const segs = t => typeof t === 'string' ? [[t, {}]] : t.map(s => [s[0], s[1] || {}]);
+function run(t, o) {
+  o = o || {};
+  return `<w:r><w:rPr>${o.b ? '<w:b/>' : ''}${o.i ? '<w:i/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}${o.sz ? `<w:sz w:val="${o.sz}"/><w:szCs w:val="${o.sz}"/>` : ''}</w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`;
+}
+function para(inner, o) {
+  o = o || {};
+  const pPr = (o.style ? `<w:pStyle w:val="${o.style}"/>` : '') + (o.keep ? '<w:keepNext/>' : '') +
+    (o.sp !== undefined ? `<w:spacing w:before="0" w:after="${o.sp}"/>` : '') + (o.ind ? '<w:ind w:left="284" w:hanging="284"/>' : '') + (o.jc ? `<w:jc w:val="${o.jc}"/>` : '');
+  return `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${inner}</w:p>`;
+}
+function b64bytes(u) {
+  const b = (typeof atob === 'function' ? atob : s => Buffer.from(s, 'base64').toString('binary'))(u.split(',')[1]);
+  const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a;
+}
+function docx(m) {
+  const imgs = [];
+  const image = u => {
+    const id = imgs.length + 1; imgs.push(b64bytes(u)); const cx = 1980000, cy = 792000;
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="sig${id}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="sig${id}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  };
+  const tc = (w, inner, fill) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}<w:vAlign w:val="center"/></w:tcPr>${inner}</w:tc>`;
+  const tbl = (widths, trs) => `<w:tbl><w:tblPr><w:tblW w:w="${widths.reduce((a, b) => a + b)}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(k => `<w:${k} w:val="single" w:sz="4" w:space="0" w:color="A6A6A6"/>`).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${trs}</w:tbl>` + para('', { sp: 60 });
+  let body = '';
+  for (const b of m.blocks) {
+    if (b.type === 'title') body += para(run(b.t), { style: 'Title' });
+    else if (b.type === 'h1') body += para(run(b.t), { style: 'Heading1' });
+    else if (b.type === 'h2') body += para(run(b.t), { style: 'Heading2' });
+    else if (b.type === 'p') body += para(segs(b.t).map(([t, o]) => run(t, Object.assign({ i: b.i, color: b.sub ? '595959' : undefined }, o))).join(''), { ind: b.ind, style: b.sub ? 'Subtitle' : undefined });
+    else if (b.type === 'ul') body += b.items.map(it => para(run('•  ') + segs(it).map(([t, o]) => run(t, o)).join(''), { ind: true })).join('');
+    else if (b.type === 'table') {
+      let trs = '';
+      if (b.header) trs += `<w:tr><w:trPr><w:tblHeader/></w:trPr>${b.header.map((h, i) => tc(b.widths[i], para(run(h, { b: true, sz: 18 }), { sp: 0, jc: i && b.num ? 'center' : undefined }), 'DCE3EA')).join('')}</w:tr>`;
+      for (const r of b.rows) trs += `<w:tr><w:trPr><w:cantSplit/></w:trPr>${r.map((c, i) => { c = typeof c === 'string' ? { t: c } : c; return tc(b.widths[i], para(run(c.t, { b: c.b, color: c.color, sz: 19 }), { sp: 0, jc: i && b.num ? 'center' : undefined }), c.fill); }).join('')}</w:tr>`;
+      body += tbl(b.widths, trs);
+    } else if (b.type === 'sig') {
+      const cell = c => para(run(c.label, { b: true, sz: 19 }), { sp: 40 }) + para(run(c.name || ' ', { sz: 19 }), { sp: 40 }) + (c.img ? para(image(c.img), { sp: 0 }) : para('', { sp: 0 }));
+      body += tbl([4819, 4819], `<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="1900"/></w:trPr>${b.cells.map(c => tc(4819, cell(c))).join('')}</w:tr>`);
+    }
+  }
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const doc = `${X}<w:document ${NS}><w:body>${body}<w:sectPr><w:footerReference w:type="default" r:id="rIdF"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const ftr = `${X}<w:ftr ${NS}><w:p><w:pPr><w:pStyle w:val="Footer"/><w:jc w:val="center"/></w:pPr>${run(m.footer)}<w:fldSimple w:instr=" PAGE ">${run('1')}</w:fldSimple>${run(' / ')}<w:fldSimple w:instr=" NUMPAGES ">${run('1')}</w:fldSimple></w:p></w:ftr>`;
+  const font = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/>';
+  const st = (id, name, rPr, pPr, extra) => `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:basedOn w:val="Normal"/>${extra || ''}<w:pPr>${pPr}</w:pPr><w:rPr>${font}${rPr}</w:rPr></w:style>`;
+  const styles = `${X}<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr>${font}<w:sz w:val="21"/><w:szCs w:val="21"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="100" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>` +
+    `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:rPr>${font}</w:rPr></w:style>` +
+    st('Title', 'Title', '<w:b/><w:color w:val="1F3A5F"/><w:sz w:val="30"/><w:szCs w:val="30"/>', '<w:spacing w:before="0" w:after="60"/>', '<w:qFormat/>') +
+    st('Subtitle', 'Subtitle', '<w:sz w:val="21"/>', '<w:spacing w:before="0" w:after="200"/>', '<w:qFormat/>') +
+    st('Heading1', 'heading 1', '<w:b/><w:color w:val="1F3A5F"/><w:sz w:val="24"/><w:szCs w:val="24"/>', '<w:keepNext/><w:spacing w:before="300" w:after="120"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="1F3A5F"/></w:pBdr><w:outlineLvl w:val="0"/>', '<w:next w:val="Normal"/><w:qFormat/>') +
+    st('Heading2', 'heading 2', '<w:b/><w:sz w:val="21"/><w:szCs w:val="21"/>', '<w:keepNext/><w:spacing w:before="180" w:after="80"/><w:outlineLvl w:val="1"/>', '<w:next w:val="Normal"/><w:qFormat/>') +
+    st('Footer', 'footer', '<w:color w:val="7F7F7F"/><w:sz w:val="16"/><w:szCs w:val="16"/>', '<w:spacing w:after="0"/>') + '</w:styles>';
+  const rels = `${X}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdF" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>${imgs.map((_, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/sig${i + 1}.png"/>`).join('')}</Relationships>`;
+  const ct = `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`;
+  const root = `${X}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const enc = s => new TextEncoder().encode(s);
+  return zip([['[Content_Types].xml', enc(ct)], ['_rels/.rels', enc(root)], ['word/document.xml', enc(doc)], ['word/styles.xml', enc(styles)], ['word/footer1.xml', enc(ftr)], ['word/_rels/document.xml.rels', enc(rels)]]
+    .concat(imgs.map((b, i) => [`word/media/sig${i + 1}.png`, b])));
+}
+let CRC;
+function crc32(b) {
+  if (!CRC) { CRC = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC[n] = c >>> 0; } }
+  let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zip(files) {
+  const parts = [], cen = []; let off = 0;
+  for (const [name, data] of files) {
+    const nb = new TextEncoder().encode(name), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, 0, true); h.setUint16(12, 0x21, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, nb.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), nb, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, 0, true); c.setUint16(14, 0x21, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true);
+    c.setUint16(28, nb.length, true); c.setUint32(42, off, true);
+    cen.push(new Uint8Array(c.buffer), nb);
+    off += 30 + nb.length + data.length;
+  }
+  const cl = cen.reduce((a, b) => a + b.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cl, true); e.setUint32(16, off, true);
+  const all = parts.concat(cen, [new Uint8Array(e.buffer)]);
+  const out = new Uint8Array(all.reduce((a, b) => a + b.length, 0)); let p = 0; for (const a of all) { out.set(a, p); p += a.length; }
+  return out;
+}
+
+/* ---------- Rendu HTML ---------- */
+function html(m) {
+  const h = s => esc(s);
+  const sp = t => segs(t).map(([t, o]) => o.b ? `<b>${h(t)}</b>` : h(t)).join('');
+  return m.blocks.map(b => {
+    if (b.type === 'title') return `<h1 class="r-title">${h(b.t)}</h1>`;
+    if (b.type === 'h1') return `<h2 class="r-h1">${h(b.t)}</h2>`;
+    if (b.type === 'h2') return `<h3 class="r-h2">${h(b.t)}</h3>`;
+    if (b.type === 'p') return `<p class="${b.sub ? 'r-sub' : ''}${b.ind ? ' r-ind' : ''}${b.i ? ' r-i' : ''}">${sp(b.t)}</p>`;
+    if (b.type === 'ul') return `<ul>${b.items.map(i => `<li>${sp(i)}</li>`).join('')}</ul>`;
+    if (b.type === 'table') return `<div class="r-tw"><table class="r-t${b.num ? ' r-num' : ''}">${b.header ? `<thead><tr>${b.header.map(x => `<th>${h(x)}</th>`).join('')}</tr></thead>` : ''}<tbody>${b.rows.map(r => `<tr>${r.map(c => { c = typeof c === 'string' ? { t: c } : c; return `<td${c.fill ? ' class="r-k"' : ''}${c.color ? ` style="color:#${c.color}"` : ''}>${c.b ? `<b>${h(c.t)}</b>` : h(c.t)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+    if (b.type === 'sig') return `<div class="r-sig">${b.cells.map(c => `<div><b>${h(c.label)}</b><br>${h(c.name || '')}${c.img ? `<br><img src="${c.img}" alt="Signature">` : ''}</div>`).join('')}</div>`;
+    return '';
+  }).join('') + `<p class="r-foot">${h(m.footer.replace(/ — Page $/, ''))}</p>`;
+}
+
+G.Report = { model, docx, html, compute, parseTime, fr, sg, fdate, fclock, num };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+{
+const KEY = 'etalchrono.v1', PARC = 'etalchrono.parc';
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const addYear = s => { const m = /^(\d{4})(-\d{2}-\d{2})$/.exec(s || ''); return m ? (+m[1] + 1) + m[2] : ''; };
+const fresh = old => ({
+  doc: Object.assign({ labo: '', ref: 'PRO-MET-001', version: '1.0', dateApp: '', redacteur: '', approbateur: '' }, old && old.doc),
+  inst: Object.assign({ modele: '', serie: '', resolution: '0,01 s', operateur: '', date: today(), temp: '', refTemps: 'Smartphone synchronisé réseau (NTP) + tops de l\'application', emtCourt: '0,5', emtLong: '2' },
+    old ? { operateur: old.inst.operateur, refTemps: old.inst.refTemps, emtCourt: old.inst.emtCourt, emtLong: old.inst.emtLong } : {}),
+  offset: old ? old.offset : '', u: old ? old.u : '0,4',
+  prep: [false, false, false, false],
+  courts: [0, 1, 2].map(() => ({ tref: '600', tlu: '', start: null, state: 'idle' })),
+  long: { dureeH: old ? old.long.dureeH : '1', tref: String(3600 * (old ? +old.long.dureeH : 1)), tlu: '', start: null, state: 'idle' },
+  decision: { statut: 'auto', prochain: addYear(today()), obs: '' },
+  sig: { op: null, rq: null, rqNom: old ? old.sig.rqNom : '' }
+});
+let D;
+try { D = JSON.parse(localStorage.getItem(KEY)); } catch (e) { D = null; }
+if (!D || !D.inst) D = fresh();
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) {} };
+const $ = s => document.querySelector(s);
+const get = k => k.split('.').reduce((o, p) => o == null ? o : o[p], D);
+const set = (k, v) => { const p = k.split('.'); const l = p.pop(); p.reduce((o, q) => o[q], D)[l] = v; };
+const toast = t => { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); };
+const R = window.Report;
+
+/* ---- Horloge ---- */
+const off = () => { const n = R.num(D.offset); return isFinite(n) ? n : 0; };
+const now = () => Date.now() - off(); /* décalage positif = appareil en avance */
+let AC = null;
+const audio = () => { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) {} return AC; };
+function beepAt(ms, long) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + Math.max(0, (ms - now()) / 1000);
+  const o = a.createOscillator(), g = a.createGain();
+  o.frequency.value = long ? 1320 : 880; o.connect(g); g.connect(a.destination);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.005);
+  const len = long ? 0.6 : 0.12; g.gain.setValueAtTime(0.5, t + len - 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.start(t); o.stop(t + len + 0.02);
+}
+const scheduled = new Set();
+function events() {
+  const ev = [];
+  D.courts.forEach((c, i) => { if (c.state === 'armed') ev.push({ id: 'c' + i + 's' + c.start, at: c.start }); if (c.state === 'running') ev.push({ id: 'c' + i + 'e' + c.start, at: c.start + R.num(c.tref) * 1000 }); });
+  const L = D.long; if (L.state === 'armed') ev.push({ id: 'ls' + L.start, at: L.start }); if (L.state === 'running') ev.push({ id: 'le' + L.start, at: L.start + R.num(L.tref) * 1000 });
+  return ev;
+}
+let wake = null;
+async function wakeLock(on) {
+  try { if (on && !wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => wake = null); } if (!on && wake) { await wake.release(); wake = null; } } catch (e) {}
+}
+const pad = n => String(n).padStart(2, '0');
+const mmss = s => { s = Math.max(0, Math.ceil(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + ':' + pad(m) : m) + ':' + pad(s % 60); };
+let lastSec = -1;
+function tick() {
+  const t = now(), d = new Date(t);
+  $('#clk').innerHTML = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}<small>.${Math.floor(d.getMilliseconds() / 100)}</small>`;
+  const ev = events();
+  for (const e of ev) {
+    const dt = e.at - t;
+    if (dt < 5000 && dt > -200 && !scheduled.has(e.id)) { scheduled.add(e.id); [3000, 2000, 1000].forEach(x => { if (dt > x) beepAt(e.at - x, false); }); beepAt(e.at, true); }
+  }
+  let changed = false;
+  D.courts.forEach(c => {
+    if (c.state === 'armed' && t >= c.start) { c.state = 'running'; changed = true; flash(); }
+    else if (c.state === 'running' && t >= c.start + R.num(c.tref) * 1000) { c.state = 'done'; changed = true; flash(); }
+  });
+  const L = D.long;
+  if (L.state === 'armed' && t >= L.start) { L.state = 'running'; changed = true; flash(); }
+  else if (L.state === 'running' && t >= L.start + R.num(L.tref) * 1000) { L.state = 'done'; changed = true; flash(); }
+  if (changed) { save(); renderTrials(); }
+  const next = ev.filter(e => e.at > t).sort((a, b) => a.at - b.at)[0];
+  $('#cinfo').innerHTML = next ? `Prochain top dans <b>${mmss((next.at - t) / 1000)}</b> — à ${R.fclock(next.at)}` : `Horloge de l'appareil${off() ? ` corrigée de ${-off() > 0 ? '+' : ''}${-off()} ms` : ''} · tops sonores à la minute pile`;
+  const s = Math.floor(t / 1000);
+  if (s !== lastSec) { lastSec = s; document.querySelectorAll('[data-cd]').forEach(updCd); wakeLock(ev.length > 0); }
+  requestAnimationFrame(tick);
+}
+function flash() { const c = $('#clock'); c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); if (navigator.vibrate) try { navigator.vibrate(200); } catch (e) {} }
+function updCd(el) {
+  const o = el.dataset.cd === 'L' ? D.long : D.courts[+el.dataset.cd], t = now();
+  if (o.state === 'armed') el.textContent = 'Départ dans ' + mmss((o.start - t) / 1000);
+  else if (o.state === 'running') el.textContent = 'Arrêt dans ' + mmss((o.start + R.num(o.tref) * 1000 - t) / 1000);
+  else el.textContent = '';
+}
+function arm(o) {
+  audio();
+  const t = now(); let at = Math.ceil(t / 60000) * 60000; if (at - t < 15000) at += 60000;
+  o.start = at; o.state = 'armed'; save(); renderTrials();
+  toast('Top de départ à ' + R.fclock(at));
+}
+
+/* ---- Rendu essais ---- */
+const lbl = { idle: 'Prêt', armed: 'En attente du top de départ', running: 'En cours', done: 'Terminé' };
+function trialHTML(o, key, title) {
+  const C = R.compute(D); const r = key === 'L' ? C.long : C.courts[+key];
+  const res = isFinite(r.E) ? `<div class="res"><span>E = <b>${R.sg(r.E)} s</b></span><span>|E| + U = <b>${R.fr(r.tot)} s</b></span>${r.ok === null ? '' : `<span class="${r.ok ? 'ok' : 'nok'}"><b>${r.ok ? 'CONFORME' : 'NON CONFORME'}</b></span>`}${key === 'L' && isFinite(r.perDay) ? `<span>Dérive : <b>${R.sg(r.perDay)} s/j</b></span>` : ''}</div>` : '';
+  return `<div class="trial ${o.state}"><h4>${title}<span class="st">${lbl[o.state]}${o.start ? ' · départ ' + R.fclock(o.start) : ''}</span></h4>
+  <div class="cd" data-cd="${key}"></div>
+  <div class="btns">${o.state === 'idle' || o.state === 'done' ? `<button class="pri" data-arm="${key}">${o.state === 'done' ? 'Refaire' : 'Programmer le top'}</button>` : `<button data-cancel="${key}">Annuler</button>`}</div>
+  <div class="grid"><label>T_ref (s)<input inputmode="decimal" data-t="${key}" data-f="tref" value="${o.tref}"></label>
+  <label>T_lu, valeur affichée<input inputmode="decimal" data-t="${key}" data-f="tlu" value="${o.tlu}" placeholder="${key === 'L' ? '1:00:00.00' : '10:00.00'}"></label></div>${res}</div>`;
+}
+function renderTrials() {
+  $('#courts').innerHTML = D.courts.map((c, i) => trialHTML(c, String(i), `Essai ${i + 1} — 10 min`)).join('');
+  $('#long').innerHTML = trialHTML(D.long, 'L', 'Dérive longue');
+  document.querySelectorAll('[data-cd]').forEach(updCd);
+  renderVerdict();
+}
+const obj = k => k === 'L' ? D.long : D.courts[+k];
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-arm]'), c = e.target.closest('[data-cancel]');
+  if (a) { const o = obj(a.dataset.arm); o.tlu = ''; arm(o); }
+  if (c) { const o = obj(c.dataset.cancel); o.state = 'idle'; o.start = null; save(); renderTrials(); }
+});
+document.addEventListener('change', e => {
+  const i = e.target; if (i.dataset.t) { obj(i.dataset.t)[i.dataset.f] = i.value; save(); renderTrials(); }
+});
+
+/* ---- Champs liés ---- */
+const prepTxt = ['État physique vérifié (écran lisible, propre, boutons Start/Stop/Reset OK)', 'Pile vérifiée ou remplacée (batterie faible ou inutilisé depuis plus de 6 mois)', 'Chronomètre stabilisé à température ambiante au moins 30 min', 'Synchronisation horaire de l\'appareil de référence forcée et décalage contrôlé'];
+$('#prep').innerHTML = prepTxt.map((t, i) => `<label class="chk"><input type="checkbox" data-p="${i}">${t}</label>`).join('');
+function fillForm() {
+  document.querySelectorAll('[data-k]').forEach(el => { const v = get(el.dataset.k); el.value = v == null ? '' : v; });
+  document.querySelectorAll('[data-p]').forEach(el => el.checked = !!D.prep[+el.dataset.p]);
+  loadSig('op'); loadSig('rq'); tempChk(); renderTrials();
+}
+function tempChk() { const t = R.num(D.inst.temp); const e = $('#tchk'); e.textContent = !isFinite(t) ? '18 à 25 °C' : t >= 18 && t <= 25 ? '✓ dans la plage' : '✗ hors plage 18–25 °C'; e.style.color = !isFinite(t) ? '' : t >= 18 && t <= 25 ? 'var(--ok)' : 'var(--red)'; }
+document.querySelectorAll('[data-k]').forEach(el => el.addEventListener('input', () => {
+  set(el.dataset.k, el.value);
+  if (el.dataset.k === 'inst.date') { D.decision.prochain = addYear(el.value); $('[data-k="decision.prochain"]').value = D.decision.prochain; }
+  if (el.dataset.k === 'long.dureeH' && D.long.state !== 'running') { D.long.tref = String(3600 * +el.value); }
+  if (el.dataset.k === 'inst.serie') { const p = parc().find(x => x.serie === el.value); if (p) { D.inst.modele = p.modele; D.inst.resolution = p.resolution; $('[data-k="inst.modele"]').value = p.modele; $('[data-k="inst.resolution"]').value = p.resolution; } }
+  tempChk(); save(); if (/^(inst\.emt|u$|long\.dureeH|decision\.statut)/.test(el.dataset.k)) renderTrials(); else renderVerdict();
+}));
+document.querySelectorAll('[data-p]').forEach(el => el.addEventListener('change', () => { D.prep[+el.dataset.p] = el.checked; save(); renderVerdict(); }));
+function renderVerdict() {
+  const s = R.compute(D).statut, v = $('#verdict');
+  v.textContent = s === 'C' ? 'CONFORME' : s === 'NC' ? 'NON CONFORME' : 'Résultats incomplets';
+  v.className = 'verdict ' + (s === 'C' ? 'ok' : s === 'NC' ? 'nok' : '');
+  clearTimeout(renderVerdict.t); renderVerdict.t = setTimeout(() => { $('#preview').innerHTML = R.html(R.model(D, false)); }, 250);
+}
+
+/* ---- Parc d'instruments ---- */
+const parc = () => { try { return JSON.parse(localStorage.getItem(PARC)) || []; } catch (e) { return []; } };
+function savParc() {
+  if (!D.inst.serie) return; const p = parc().filter(x => x.serie !== D.inst.serie);
+  p.unshift({ serie: D.inst.serie, modele: D.inst.modele, resolution: D.inst.resolution });
+  try { localStorage.setItem(PARC, JSON.stringify(p.slice(0, 200))); } catch (e) {} listParc();
+}
+const listParc = () => { $('#parc').innerHTML = parc().map(x => `<option value="${x.serie.replace(/"/g, '&quot;')}">${(x.modele || '').replace(/</g, '&lt;')}</option>`).join(''); };
+
+/* ---- Signatures ---- */
+function pad_(id) {
+  const c = $('#sig' + id), x = c.getContext('2d'); let dn = false;
+  const pt = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.addEventListener('pointerdown', e => { dn = true; c.setPointerCapture(e.pointerId); x.beginPath(); x.moveTo(...pt(e)); });
+  c.addEventListener('pointermove', e => { if (!dn) return; x.lineWidth = 3; x.lineCap = 'round'; x.strokeStyle = '#111'; x.lineTo(...pt(e)); x.stroke(); });
+  const end = () => { if (!dn) return; dn = false; D.sig[id] = c.toDataURL('image/png'); save(); renderVerdict(); };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+}
+function loadSig(id) {
+  const c = $('#sig' + id), x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height);
+  if (D.sig[id]) { const i = new Image(); i.onload = () => x.drawImage(i, 0, 0); i.src = D.sig[id]; }
+}
+pad_('op'); pad_('rq');
+document.querySelectorAll('[data-clear]').forEach(b => b.addEventListener('click', () => { D.sig[b.dataset.clear] = null; loadSig(b.dataset.clear); save(); renderVerdict(); }));
+
+/* ---- Exports ---- */
+function dl(name, blob) {
+  const u = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+}
+const base = () => `Etalonnage_${(D.inst.serie || 'chrono').replace(/[^\w-]+/g, '_')}_${D.inst.date || today()}`;
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+$('#bDocx').onclick = () => { savParc(); dl(base() + '.docx', new Blob([R.docx(R.model(D, false))], { type: DOCX })); toast('Rapport Word téléchargé'); };
+$('#bBlank').onclick = () => { dl('Procedure_etalonnage_chronometre_vierge.docx', new Blob([R.docx(R.model(fresh(), true))], { type: DOCX })); };
+$('#bPdf').onclick = () => { savParc(); $('#print').innerHTML = R.html(R.model(D, false)); document.title = base(); setTimeout(() => { try { window.print(); } catch (e) { toast('Impression indisponible ici'); } document.title = 'Étalonnage chronomètre'; }, 50); };
+$('#bJson').onclick = () => { savParc(); dl(base() + '.json', new Blob([JSON.stringify(D, null, 1)], { type: 'application/json' })); };
+$('#bOpen').onclick = () => $('#fOpen').click();
+$('#fOpen').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { try { const n = JSON.parse(t); if (!n.inst || !n.courts) throw 0; D = n; save(); fillForm(); toast('Dossier chargé'); } catch (x) { toast('Fichier non reconnu'); } }); e.target.value = ''; };
+$('#bNew').onclick = () => { if (D._confirm && Date.now() - D._confirm < 4000) { D = fresh(D); save(); fillForm(); toast('Nouvel étalonnage : résultats remis à zéro'); scrollTo(0, 0); } else { D._confirm = Date.now(); toast('Appuie encore une fois pour effacer les résultats en cours'); } };
+
+/* ---- Démarrage ---- */
+const ch = () => document.documentElement.style.setProperty('--ch', $('#clock').offsetHeight + 'px');
+new ResizeObserver(ch).observe($('#clock'));
+listParc(); fillForm(); requestAnimationFrame(tick);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

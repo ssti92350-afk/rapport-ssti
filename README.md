@@ -63,3 +63,8 @@ Lien en bas du formulaire : « Modifier l'en-tête et le pied de page (administr
 
 - Intégration dans la GMAO (Lovable) : classement automatique des rapports par client et par numéro (2026-S320, S321, S322…), liste d'appareils de mesure commune à l'équipe, comptes techniciens.
 - Ajout des pages des documents PDF à la suite du rapport.
+
+
+## Étalonnage chronomètre de paillasse
+
+Appli d'étalonnage interne (procédure PRO-MET-001) : https://ssti92350-afk.github.io/rapport-ssti/etalonnage/
