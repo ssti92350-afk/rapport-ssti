@@ -68,3 +68,14 @@ Lien en bas du formulaire : « Modifier l'en-tête et le pied de page (administr
 ## Étalonnage chronomètre de paillasse
 
 Appli d'étalonnage interne (procédure PRO-MET-001) : https://ssti92350-afk.github.io/rapport-ssti/etalonnage/
+
+## Versions du formulaire
+
+La version est imprimée en bas à droite de chaque page du PDF (« Form. V1 ») et affichée en bas du formulaire (`VERSION_FORMULAIRE` dans `index.html`).
+Chaque modification significative, validée comme nouvelle version, ajoute une ligne ici et dans `src/lib/versions.ts` de la GMAO ; la page Aide de la GMAO archive chaque version (notes en PDF + copie exacte du formulaire) dans Drive, dossier « Versions GMAO SSTI / Rapport d'intervention », recopié sur le Synology.
+La référence documentaire par type de rapport (réf., version, date d'application, ex. ENR-SAV-07) se règle dans l'administration du formulaire.
+
+| Version | Date | Changements |
+| --- | --- | --- |
+| V1 | 22/11/2026 | Première version référencée : rapports défilement, impulsion, autre type et soudeuse de prêt (SSTI RSP v1.0) ; clients et machines de la GMAO, série de machines identiques, plusieurs machines avec PDF séparés, validation avant PDF, numéro provisoire, envoi à la GMAO et à Drive, hors connexion. |
+

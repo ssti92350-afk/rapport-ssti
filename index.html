@@ -622,6 +622,8 @@ root.MiniPDF=MiniPDF;
 const $=id=>document.getElementById(id);
 /* Réglages verrouillés par code : modifiables uniquement par l'administrateur */
 const CONFIG_DEFAUT=JSON.parse(document.getElementById('cfgData').textContent);
+/* Version du formulaire (historique : README « Versions », archivée dans Drive depuis la page Aide de la GMAO). À augmenter à chaque nouvelle version validée par VAL. */
+const VERSION_FORMULAIRE='V1';
 const CFG_PRET={titrePret:'RAPPORT SOUDEUSE DE PRÊT – REQUALIFICATION OPÉRATIONNELLE',normePret:'Selon NF EN 11607-2',docRef_pret:'SSTI RSP',docVer_pret:'1.0'};
 let CFG=(()=>{try{const v=JSON.parse(localStorage.getItem('ssti_cfg'));if(v&&v.hash)return {...CFG_PRET,...CONFIG_DEFAUT,...v}}catch(e){}return {...CFG_PRET,...CONFIG_DEFAUT}})();
 /* Logo commun : celui de la version en ligne s'impose sur tous les appareils et tous les rapports */
@@ -640,7 +642,7 @@ const hashCode=c=>sha256('ssti-rapport:'+c);
 function applyCfg(){const L=$('hLogo');if(CFG.logo){L.src=CFG.logo;L.hidden=false;L.style.width=(CFG.logoW||35)+'mm';
     L.style.justifySelf={gauche:'start',centre:'center',droite:'end'}[CFG.logoPos||'gauche']}else{L.hidden=true;L.removeAttribute('src')}
   $('hTitre').textContent=CFG.titre;$('hNorme').textContent=CFG.norme;
-  $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`+(docLine()?`<br><span class="mono">${esc(docLine())}</span>`:'')}
+  $('fTxt').innerHTML=`<b>${esc(CFG.societe)}</b> – ${esc(CFG.adresse)} – Tél : ${esc(CFG.tel)}<br>${esc(CFG.email)}`+(docLine()?`<br><span class="mono">${esc(docLine())}</span>`:'')+`<br><span class="mono">Formulaire ${VERSION_FORMULAIRE}</span>`}
 /* Référence qualité : « Réf. ENR-SAV-07 – Version 3 du 01.12.2026 » */
 function docLine(){const g=k=>String(CFG[k+'_'+(typeof kind!=='undefined'&&kind==='pret'?'pret':type)]||'').trim(),r=g('docRef'),v=g('docVer'),d=g('docDate')?fmtD(g('docDate')):'';
   const ver=v?('Version '+v.replace(/^v(ersion)?\s*/i,'')+(d?' du '+d:'')):(d?'Applicable le '+d:'');return [r?'Réf. '+r:'',ver].filter(Boolean).join(' – ')}
@@ -1029,7 +1031,7 @@ function buildPdf(){
     doc.setFont('helvetica','bold');doc.text(so,x0,287.2);doc.setFont('helvetica','normal');doc.text(rest,x0+sw1,287.2);
     doc.text(CFG.email||'',W/2,290.8,{align:'center'});
     if(dlBot){doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(dl,62)[0],M,290.8);doc.setFont('helvetica','normal')}
-    doc.text(`${riVal()||''}  ·  page ${i}/${pages}`,W-M,290.8,{align:'right'});
+    doc.text(`${riVal()||''}  ·  Form. ${VERSION_FORMULAIRE}  ·  page ${i}/${pages}`,W-M,290.8,{align:'right'});
     if(isProv()){try{doc.saveGraphicsState();doc.setGState(new doc.GState({opacity:0.1}));doc.setFont('helvetica','bold');doc.setFontSize(80);doc.setTextColor(180,91,8);
       doc.text('PROVISOIRE',W/2+10,175,{angle:45,align:'center'});doc.restoreGraphicsState()}catch(e){}}}
   return doc;
