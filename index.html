@@ -300,7 +300,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding-top:4px}
   <section><h2><span class="n">03</span><span id="machTitle">Information machine</span></h2><div class="body grid">
     <div class="mach-sug" id="machSug" style="grid-column:1/-1" hidden></div>
     <div class="f"><label for="fab">Fabricant</label><input id="fab" value="HAWO"></div>
-    <div class="f"><label for="modele" id="modeleLbl">Modèle</label><input id="modele" class="mono" placeholder="HM3010DCV"></div>
+    <div class="f"><label for="modele" id="modeleLbl">Modèle</label><select id="modeleSel" aria-label="Modèle de soudeuse" hidden></select><input id="modele" class="mono" placeholder="HM3010DCV"></div>
     <div class="f"><label for="sn">N° de série</label><input id="sn" class="mono" placeholder="438780" autocomplete="off" aria-autocomplete="list" aria-controls="snList">
       <div class="cli-list" id="snList" role="listbox" hidden></div></div>
     <div class="f int-only"><label for="soft">Version software</label><input id="soft" class="mono" placeholder="v173.A06"></div>
@@ -1305,7 +1305,7 @@ function idb(){return new Promise((ok,ko)=>{try{const r=indexedDB.open(DRAFT_DB,
 async function idbDo(mode,fn,store){store=store||'d';const db=await idb();return new Promise((ok,ko)=>{const tx=db.transaction(store,mode),st=tx.objectStore(store),rq=fn(st);
   tx.oncomplete=()=>{db.close();ok(rq&&rq.result)};tx.onerror=tx.onabort=()=>{db.close();ko(tx.error)}})}
 function draftFields(){return [...document.querySelectorAll('main input[id],main select[id],main textarea[id]')].filter(e=>e.type!=='file'&&
-  !e.closest('#admPanel,#eqDetails,#ocrSec,#histSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode','serieIn'].includes(e.id))}
+  !e.closest('#admPanel,#eqDetails,#ocrSec,#histSec')&&!/^(m_|mc_|cap_|allok_|ech_|oth_)/.test(e.id)&&!['intNew','admCode','serieIn','modeleSel'].includes(e.id))}
 function draftData(){const f={};draftFields().forEach(e=>f[e.id]=e.type==='checkbox'?e.checked:e.value);
   return{v:1,savedAt:Date.now(),type,choices,sel:[...sel],MES,PHOTOS,DOCS,IPARTS,nextManual,riSaved,auto:[...AUTO],doutes:OCR_DOUTES,
     sigs:pads.map((p,i)=>p.used?(sigCache[i]||(sigCache[i]=p.c.toDataURL('image/png'))):null),OTHERS,f}}
@@ -1833,7 +1833,8 @@ let M=(LSg()||{}).list||[],at=(LSg()||{}).at||0,loading=false,shown=[],act=-1;
 const nz=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 const pret=()=>typeof kind!=='undefined'&&kind==='pret';
 /** Modèles HAWO « …DC… » : à défilement ; autres HM… : à impulsion ; sinon type inchangé. */
-const guess=m=>{const x=String(m||'').toUpperCase().replace(/\s+/g,'');return /DC/.test(x)?'defil':/^HM\d/.test(x)?'impul':''};
+const guess=m=>{const x=String(m||'').toUpperCase().replace(/\s+/g,'');const k=window.modeleType&&window.modeleType(m);if(k)return k;
+  return /DC/.test(x)||/^HM\d+D$/.test(x)||/^(HD|HPL|ECOPACK)/.test(x)?'defil':/^HM\d/.test(x)?'impul':''};
 async function refresh(force){const A=window.__gmaoApi;if(!A||loading)return;if(!force&&M.length&&Date.now()-at<6e5)return;loading=true;
   try{const t=await A.token();if(!t)return;
     const r=await fetch(A.url+'/rest/v1/rpc/machines_connues',{method:'POST',headers:{apikey:A.key,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
@@ -2027,6 +2028,42 @@ window.__gmaoMachines={refresh,render,list:()=>M};
   {const ad=applyDraft;applyDraft=function(d){ad(d);paint()}}
   {const nr=window.newReport;window.newReport=function(){nr.apply(this,arguments);na.checked=false;paint();scheduleDraft()}}
   $('sig1').addEventListener('pointerdown',()=>{if(na.checked){na.checked=false;paint()}});
+  paint()})();
+/* ===== Modèle de soudeuse : menu déroulant selon le type (défilement / impulsion), modèles ajoutés gardés sur l'appareil =====
+   La HM 8000 ASV aura son propre rapport (à venir). « Autre type de soudeuse » et soudeuse de prêt : saisie libre. */
+(()=>{const BASE={defil:['HM3010DCV','HM3020DCV','HM880DCV','HM850DCV','HM950DCV','HM780DCV','HM500D','HD680','HM4000','HPL3000','EcoPack03','EcoPack05','EcoPack06','EcoPack07'],impul:['HM500ASV','HM660ASV']};
+  const MK='ssti_modeles',nz=x=>String(x||'').toUpperCase().replace(/\s+/g,'');
+  let ADD=(()=>{try{const v=JSON.parse(localStorage.getItem(MK));if(v&&typeof v==='object')return{defil:[],impul:[],...v}}catch(e){}return{defil:[],impul:[]}})();
+  const list=t=>[...(BASE[t]||[]),...(ADD[t]||[])];
+  window.modeleType=m=>{const x=nz(m);if(!x)return'';return ['defil','impul'].find(t=>list(t).some(y=>nz(y)===x))||''};
+  const S=$('modeleSel'),I=$('modele');
+  const on=()=>(type==='defil'||type==='impul')&&!(typeof kind!=='undefined'&&kind==='pret');
+  let last=null,lastT=null,free=false;
+  function paint(){last=I.value;lastT=type+(typeof kind!=='undefined'?kind:'');if(!on()){S.hidden=true;I.hidden=false;return}
+    const L=list(type),cur=I.value.trim(),hit=L.find(y=>nz(y)===nz(cur));
+    S.innerHTML='<option value="">— Choisir le modèle —</option>'+L.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('')+
+      '<option value="__autre">Autre modèle (saisie libre)…</option><option value="__add">+ Ajouter un modèle à la liste…</option>';
+    S.hidden=false;
+    if(hit&&!free){S.value=hit;I.hidden=true}else if(cur||free){S.value='__autre';I.hidden=false}else{S.value='';I.hidden=true}}
+  function set(v){I.value=v;I.dispatchEvent(new Event('input',{bubbles:true}));I.dispatchEvent(new Event('change',{bubbles:true}))}
+  S.addEventListener('change',()=>{const v=S.value;
+    if(v==='__autre'){free=true;if(window.modeleType(I.value))set('');paint();I.focus();return}
+    free=false;
+    if(v==='__add'){const n=(prompt('Nouveau modèle de '+(type==='defil'?'soudeuse à défilement':'soudeuse impulsion')+' (ex. HM3030DCV, chiffres collés aux lettres) :')||'').replace(/\s+/g,'');
+      if(!n){paint();return}
+      if(!list(type).some(y=>nz(y)===nz(n))){ADD[type]=[...(ADD[type]||[]),n];try{localStorage.setItem(MK,JSON.stringify(ADD))}catch(e){}toast('Modèle '+n+' ajouté à la liste')}
+      set(n);paint();scheduleDraft();return}
+    set(v);paint();scheduleDraft()});
+  I.addEventListener('input',()=>{if(!S.hidden&&document.activeElement!==I)paint()});
+  I.addEventListener('blur',()=>{if(!S.hidden&&window.modeleType(I.value)===type)paint()});
+  $('typeSel').addEventListener('click',e=>{if(!e.target.closest('[data-type]'))return;setTimeout(()=>{const k=window.modeleType(I.value);free=false;if(k&&k!==type&&on())set('');paint()},0)});
+  document.addEventListener('click',e=>{if(e.target.closest('#kindSel [data-kind]'))setTimeout(paint,0)});
+  {const ad=applyDraft;applyDraft=function(d){free=false;ad(d);paint()}}
+  {const nr=window.newReport;window.newReport=function(){nr.apply(this,arguments);free=false;paint()}}
+  {const rb=$('btnReset').onclick;$('btnReset').onclick=function(){rb.apply(this,arguments);setTimeout(()=>{free=false;paint()},0)}}
+  new MutationObserver(()=>setTimeout(paint,0)).observe($('machSug'),{childList:true});
+  /* Modèle rempli par la GMAO, le QR code ou la lecture des notes : le menu suit */
+  setInterval(()=>{if(document.activeElement!==I&&(I.value!==last||type+(typeof kind!=='undefined'?kind:'')!==lastT)){if(I.value!==last&&window.modeleType(I.value))free=false;paint()}},700);
   paint()})();
 /* ===== Préventif : toutes les rubriques de contrôle remplies d'office (défilement et impulsion), chaque ligne reste modifiable =====
    Seules les lignes encore vides sont remplies. En repassant en curatif/autre, les réponses mises d'office et non modifiées sont retirées. */
