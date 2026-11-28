@@ -1834,7 +1834,7 @@ const nz=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUppe
 const pret=()=>typeof kind!=='undefined'&&kind==='pret';
 /** Modèles HAWO « …DC… » : à défilement ; autres HM… : à impulsion ; sinon type inchangé. */
 const guess=m=>{const x=String(m||'').toUpperCase().replace(/\s+/g,'');const k=window.modeleType&&window.modeleType(m);if(k)return k;
-  return /DC/.test(x)||/^HM\d+D$/.test(x)||/^(HD|HPL|ECOPACK)/.test(x)?'defil':/^HM\d/.test(x)?'impul':''};
+  return /DC/.test(x)||/^HM\d+D$/.test(x)||/^(HD|HPL|ECOPA)/.test(x)?'defil':/^HM\d/.test(x)?'impul':''};
 async function refresh(force){const A=window.__gmaoApi;if(!A||loading)return;if(!force&&M.length&&Date.now()-at<6e5)return;loading=true;
   try{const t=await A.token();if(!t)return;
     const r=await fetch(A.url+'/rest/v1/rpc/machines_connues',{method:'POST',headers:{apikey:A.key,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
@@ -2031,7 +2031,7 @@ window.__gmaoMachines={refresh,render,list:()=>M};
   paint()})();
 /* ===== Modèle de soudeuse : menu déroulant selon le type (défilement / impulsion), modèles ajoutés gardés sur l'appareil =====
    La HM 8000 ASV aura son propre rapport (à venir). « Autre type de soudeuse » et soudeuse de prêt : saisie libre. */
-(()=>{const BASE={defil:['HM3010DCV','HM3020DCV','HM880DCV','HM850DCV','HM950DCV','HM780DCV','HM500D','HD680','HM4000','HPL3000','EcoPack03','EcoPack05','EcoPack06','EcoPack07'],impul:['HM500ASV','HM660ASV']};
+(()=>{const BASE={defil:['HM3010DCV','HM3020DCV','HM880DCV','HM850DCV','HM950DCV','HM780DCV','HM500D','HD680','HM4000','HPL3000','ECOPAK03','ECOPAK05','ECOPAK06','ECOPAK07'],impul:['HM500ASV','HM660ASV']};
   const MK='ssti_modeles',nz=x=>String(x||'').toUpperCase().replace(/\s+/g,'');
   let ADD=(()=>{try{const v=JSON.parse(localStorage.getItem(MK));if(v&&typeof v==='object')return{defil:[],impul:[],...v}}catch(e){}return{defil:[],impul:[]}})();
   const list=t=>[...(BASE[t]||[]),...(ADD[t]||[])];
