@@ -727,11 +727,13 @@ function chipsHTML(key,set){return SETS[set].map(([t,c])=>`<button type="button"
 document.addEventListener('click',ev=>{const b=ev.target.closest('.chip');if(!b)return;const k=b.dataset.k,v=b.dataset.v;
   choices[k]=choices[k]===v?undefined:v;b.parentNode.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[k]===x.dataset.v));syncAllOk()});
 
-/* « Tout valider » par rubrique : pièces → Remplacé, inspections/nettoyages/contrôles → Contrôlé, Oui/Non → Oui */
-function allOkValue(item,set){if(set==='yn')return'Oui';if(set==='ok')return'Conforme';
+/* « Tout valider » par rubrique : pièces → Remplacé (2e/3e niveau → Contrôlé), inspections/nettoyages/contrôles → Contrôlé, Oui/Non → Oui */
+/* Pièces de 2e et 3e niveau : « Contrôlé » (à passer en « Remplacé » à la main si la pièce est changée) */
+const isLvl2=si=>{const s=TYPES[type].sections[si];return !!s&&/niveau/i.test(s[0])};
+function allOkValue(item,set,si){if(set==='yn')return'Oui';if(set==='ok')return'Conforme';if(si!=null&&isLvl2(si))return'Contrôlé';
   return /^(inspection|nettoyage|mise en route|contr[ôo]le|v[ée]rification|[ée]talonnage|synchronisation|calibration)/i.test(item.trim())?'Contrôlé':'Remplacé'}
 function syncAllOk(){const t=TYPES[type];document.querySelectorAll('[data-allok]').forEach(cb=>{const s=t.sections[+cb.dataset.allok];if(!s)return;
-  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set))&&othLines(+cb.dataset.allok).every(o=>choices[o.k]===allOkValue(o.name,set))})}
+  const[, set,items]=s;cb.checked=items.length>0&&items.every(i=>choices[type+'|'+i]===allOkValue(i,set,+cb.dataset.allok))&&othLines(+cb.dataset.allok).every(o=>choices[o.k]===allOkValue(o.name,set,+cb.dataset.allok))})}
 /* Lignes ajoutées dans chaque rubrique : intitulé, réponse, commentaire facultatif, option « garder pour les prochains rapports » */
 let OTHERS={};Object.keys(TYPES).forEach(t=>OTHERS[t]={});
 const othKey=(si,id)=>`${type}|autre|${si}|${id}`;
@@ -771,9 +773,9 @@ document.addEventListener('click',ev=>{const a=ev.target.closest('[data-othadd]'
   const[si,id]=r.dataset.othrm.split('|');delete choices[othKey(si,id)];OTHERS[type][si]=othList(+si).filter(x=>x.id!==id);renderOthers(+si)});
 document.addEventListener('change',ev=>{const cb=ev.target.closest('[data-allok]');if(!cb)return;
   const si=+cb.dataset.allok,[, set,items]=TYPES[type].sections[si],sec=document.querySelector(`#dyn section[data-si="${si}"]`);
-  items.forEach(i=>{const k=type+'|'+i,v=allOkValue(i,set);
+  items.forEach(i=>{const k=type+'|'+i,v=allOkValue(i,set,si);
     if(cb.checked){choices[k]=v;if(typeof AUTO!=='undefined')AUTO.delete('k:'+k)}else if(choices[k]===v)choices[k]=undefined});
-  othLines(si).forEach(o=>{const v=allOkValue(o.name,set);if(cb.checked)choices[o.k]=v;else if(choices[o.k]===v)choices[o.k]=undefined});
+  othLines(si).forEach(o=>{const v=allOkValue(o.name,set,si);if(cb.checked)choices[o.k]=v;else if(choices[o.k]===v)choices[o.k]=undefined});
   if(sec){sec.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',choices[x.dataset.k]===x.dataset.v));sec.querySelectorAll('.row.auto').forEach(r=>r.classList.remove('auto'))}
   syncAllOk();toast(cb.checked?'Rubrique remplie – chaque ligne reste modifiable':'Rubrique vidée')});
 
@@ -2026,6 +2028,21 @@ window.__gmaoMachines={refresh,render,list:()=>M};
   {const nr=window.newReport;window.newReport=function(){nr.apply(this,arguments);na.checked=false;paint();scheduleDraft()}}
   $('sig1').addEventListener('pointerdown',()=>{if(na.checked){na.checked=false;paint()}});
   paint()})();
+/* ===== Préventif : toutes les rubriques de contrôle remplies d'office (défilement et impulsion), chaque ligne reste modifiable =====
+   Seules les lignes encore vides sont remplies. En repassant en curatif/autre, les réponses mises d'office et non modifiées sont retirées. */
+(()=>{let AUTOP=new Map();
+  const ok=()=>$('defSig').value==='PRÉVENTIF'&&(type==='defil'||type==='impul')&&!(typeof kind!=='undefined'&&kind==='pret');
+  function lines(){const out=[];TYPES[type].sections.forEach(([,set,items],si)=>{items.forEach(i=>out.push([type+'|'+i,allOkValue(i,set,si)]));othLines(si).forEach(o=>out.push([o.k,allOkValue(o.name,set,si)]))});return out}
+  function repaint(){document.querySelectorAll('#dyn .chip').forEach(x=>x.setAttribute('aria-pressed',choices[x.dataset.k]===x.dataset.v));syncAllOk()}
+  function fill(){if(!ok())return 0;let n=0;lines().forEach(([k,v])=>{if(choices[k])return;choices[k]=v;AUTOP.set(k,v);AUTO.delete('k:'+k);n++});if(n){repaint();scheduleDraft()}return n}
+  function unfill(){let n=0;AUTOP.forEach((v,k)=>{if(choices[k]===v){choices[k]=undefined;n++}});AUTOP=new Map();if(n){repaint();scheduleDraft()}return n}
+  const empty=()=>!lines().some(([k])=>choices[k]);
+  $('defSig').addEventListener('change',()=>{if(ok()){if(fill())toast('Préventif : rubriques remplies d\'office – décochez ce qui ne s\'applique pas')}else if(unfill())toast('Réponses mises d\'office pour le préventif retirées')});
+  $('typeSel').addEventListener('click',e=>{if(e.target.closest('[data-type]')&&empty())setTimeout(fill,0)});
+  {const nr=window.newReport;window.newReport=function(){nr.apply(this,arguments);AUTOP=new Map();setTimeout(()=>{if(empty())fill()},0)}}
+  {const rb=$('btnReset').onclick;$('btnReset').onclick=function(){const armed=!!this.dataset.armed;rb.apply(this,arguments);if(armed){AUTOP=new Map();setTimeout(()=>{if(empty())fill()},0)}}}
+  {const ad=applyDraft;applyDraft=function(d){AUTOP=new Map();ad(d)}}
+  (function start(){if(!draftReady){setTimeout(start,100);return}if(empty())fill()})()})();
 </script>
 <script>
 /* Fonctionnement hors connexion : met l'application en cache après la première ouverture */
